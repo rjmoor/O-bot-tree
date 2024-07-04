@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backtest Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Navigation</h2>
+            <ul>
+                <li><a href="{{ url_for('index') }}">Overview</a></li>
+                <li><a href="#">Account Settings</a></li>
+                <li><a href="{{ url_for('trades') }}">Open Trades</a></li>
+                <li><a href="{{ url_for('positions') }}">Open Positions</a></li>
+                <li><a href="{{ url_for('backtest') }}">Backtest</a></li>
+                <li><a href="#">Settings</a></li>
+            </ul>
+        </div>
+        <div class="content">
+            <h1>Backtest Results</h1>
+            <div class="plot">
+                <img src="data:image/png;base64,{{ plot_url }}" alt="Backtest Plot">
+            </div>
+            <div class="metrics">
+                <h2>Backtest Metrics</h2>
+                <p><strong>Total Return:</strong> {{ total_return * 100 }}%</p>
+                <p><strong>Number of Trades:</strong> {{ num_trades }}</p>
+                <p><strong>Win Rate:</strong> {{ win_rate * 100 }}%</p>
+            </div>
+            <div class="optimization">
+                <h2>Optimization</h2>
+                <form action="{{ url_for('optimize') }}" method="POST">
+                    <div>
+                        <label for="indicator">Indicator:</label>
+                        <select name="indicator" id="indicator">
+                            <option value="RSI">RSI</option>
+                            <option value="MACD">MACD</option>
+                            <option value="SMA">SMA</option>
+                            <option value="EMA">EMA</option>
+                            <option value="BOLLINGER_BANDS">Bollinger Bands</option>
+                            <option value="STOCHASTIC">Stochastic</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="parameter">Parameter:</label>
+                        <select name="parameter" id="parameter">
+                            <!-- RSI Parameters -->
+                            <option value="RSI_PERIOD">RSI Period</option>
+                            <option value="RSI_OVERBOUGHT">RSI Overbought</option>
+                            <option value="RSI_OVERSOLD">RSI Oversold</option>
+                            <!-- MACD Parameters -->
+                            <option value="MACD_FAST_PERIOD">MACD Fast Period</option>
+                            <option value="MACD_SLOW_PERIOD">MACD Slow Period</option>
+                            <option value="MACD_SIGNAL_PERIOD">MACD Signal Period</option>
+                            <!-- SMA Parameters -->
+                            <option value="SMA_PERIOD">SMA Period</option>
+                            <option value="SMA_FAST">SMA Fast</option>
+                            <option value="SMA_SLOW">SMA Slow</option>
+                            <!-- EMA Parameters -->
+                            <option value="EMA_PERIOD">EMA Period</option>
+                            <option value="EMA_FAST">EMA Fast</option>
+                            <option value="EMA_SLOW">EMA Slow</option>
+                            <!-- Bollinger Bands Parameters -->
+                            <option value="BOLLINGER_BANDS_PERIOD">Bollinger Bands Period</option>
+                            <option value="BOLLINGER_BANDS_STD_DEV">Bollinger Bands Std Dev</option>
+                            <!-- Stochastic Parameters -->
+                            <option value="STOCHASTIC_K_PERIOD">Stochastic K Period</option>
+                            <option value="STOCHASTIC_D_PERIOD">Stochastic D Period</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="range">Range (comma-separated):</label>
+                        <input type="text" id="range" name="range">
+                    </div>
+                    <div>
+                        <button type="submit">Optimize</button>
+                    </div>
+                </form>
+            </div>
+            <div class="optimization-results">
+                {% if optimization_results %}
+                <h2>Optimization Results</h2>
+                <p><strong>Best Parameter:</strong> {{ optimization_results.best_param }}</p>
+                <p><strong>Total Return:</strong> {{ optimization_results.total_return * 100 }}%</p>
+                <p><strong>Number of Trades:</strong> {{ optimization_results.num_trades }}</p>
+                <p><strong>Win Rate:</strong> {{ optimization_results.win_rate * 100 }}%</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

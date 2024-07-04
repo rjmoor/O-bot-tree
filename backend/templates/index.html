@@ -4,11 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account Status</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
 </head>
 <body>
-    <h1>Account Status</h1>
-    <p><strong>Account ID:</strong> {{ account_info['account_id'] }}</p>
-    <p><strong>Balance:</strong> {{ account_info['balance'] }}</p>
-    <p><strong>Open Exchanges:</strong> {{ account_info['open_exchanges'] }}</p>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Navigation</h2>
+            <ul>
+                <li><a href="{{ url_for('index') }}">Overview</a></li>
+                <li><a href="#">Account Settings</a></li>
+                <li><a href="{{ url_for('trades') }}">Open Trades</a></li>
+                <li><a href="{{ url_for('positions') }}">Open Positions</a></li>
+                <li><a href="{{ url_for('backtest') }}">Backtest</a></li>
+                <li><a href="#">Settings</a></li>
+            </ul>
+        </div>
+        <div class="content">
+            <h1>Account Status</h1>
+            <p><strong>Account ID:</strong> {{ account_info['account_id'] }}</p>
+            <p><strong>Balance:</strong> {{ account_info['balance'] }}</p>
+            <p><strong>Margin Used:</strong> {{ account_info['margin_used'] }}</p>
+            <p><strong>Margin Available:</strong> {{ account_info['margin_available'] }}</p>
+            <p><strong>Open Trades:</strong> {{ account_info['open_trades'] }}</p>
+            <p><strong>Open Positions:</strong> {{ account_info['open_positions'] }}</p>
+            <p><strong>Unrealized P/L:</strong> {{ account_info['unrealized_pl'] }}</p>
+            <p><strong>Open Exchanges:</strong> {{ account_info['open_exchanges'] }}</p>
+            <div class="plot">
+                <img src="{{ url_for('plot', plot_type='balance') }}" alt="Balance Plot">
+            </div>
+        </div>
+    </div>
 </body>
 </html>

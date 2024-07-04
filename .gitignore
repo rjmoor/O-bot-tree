@@ -1,0 +1,7 @@
+
+/backend/__pycache__
+backend/.DS_Store
+/backend/logs
+backend/OandaAPIData.log
+backend/static/styles/main.css.map
+backend/static/styles/main.scss

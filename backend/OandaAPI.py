@@ -13,7 +13,7 @@ from flask import Flask, jsonify, render_template
 app = Flask(__name__)
 
 # Configure logging
-logging.basicConfig(filename='OandaAPIData.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+logging.basicConfig(filename='./logs/OandaAPIData.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 class OandaAPI:
     # Connection and Initialization

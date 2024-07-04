@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open Trades</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Navigation</h2>
+            <ul>
+                <li><a href="{{ url_for('index') }}">Overview</a></li>
+                <li><a href="#">Account Settings</a></li>
+                <li><a href="{{ url_for('trades') }}">Open Trades</a></li>
+                <li><a href="{{ url_for('positions') }}">Open Positions</a></li>
+                <li><a href="{{ url_for('backtest') }}">Backtest</a></li>
+                <li><a href="#">Settings</a></li>
+            </ul>
+        </div>
+        <div class="content">
+            <h1>Open Trades</h1>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Trade ID</th>
+                        <th>Instrument</th>
+                        <th>Units</th>
+                        <th>Price</th>
+                        <th>Unrealized P/L</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for trade in trades %}
+                    <tr>
+                        <td>{{ trade['id'] }}</td>
+                        <td>{{ trade['instrument'] }}</td>
+                        <td>{{ trade['currentUnits'] }}</td>
+                        <td>{{ trade['price'] }}</td>
+                        <td>{{ trade['unrealizedPL'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
