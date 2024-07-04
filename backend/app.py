@@ -1,14 +1,14 @@
 import base64
 import io
-import logging
 from datetime import datetime, timedelta, timezone
-
-import defs
+import logging
 import matplotlib
 import pandas as pd
 import requests
-from dateutil.parser import parse
 from flask import Flask, jsonify, render_template, request, send_file
+from dateutil.parser import parse
+
+import defs
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -141,25 +141,60 @@ class OandaAPI:
             logging.error(f"Failed to retrieve historical data: {response.status_code} {response.text}")
             return None, f"Failed to retrieve historical data: {response.status_code} {response.text}"
 
-def backtest_strategy(data, param=None):
-    if param:
-        data['SMA'] = data['close'].rolling(window=param).mean()
-    else:
-        data['SMA'] = data['close'].rolling(window=50).mean()
-    
-    data.dropna(inplace=True)
-    
-    data['Signal'] = 0
-    data['Signal'][data['close'] > data['SMA']] = 1
-    data['Position'] = data['Signal'].diff()
-    
+def backtest_strategy(data, indicators, param=None):
+    if 'SMA' in indicators:
+        if param:
+            data['SMA'] = data['close'].rolling(window=param).mean()
+        else:
+            data['SMA'] = data['close'].rolling(window=50).mean()
+        data.dropna(inplace=True)
+        data['Signal'] = 0
+        data.loc[data['close'] > data['SMA'], 'Signal'] = 1
+        data['Position'] = data['Signal'].diff()
+
+    if 'EMA' in indicators:
+        data['EMA'] = data['close'].ewm(span=50, adjust=False).mean()
+        data.dropna(inplace=True)
+        data['Signal'] = 0
+        data.loc[data['close'] > data['EMA'], 'Signal'] = 1
+        data['Position'] = data['Signal'].diff()
+
+    if 'RSI' in indicators:
+        delta = data['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        data['RSI'] = 100 - (100 / (1 + rs))
+        data.dropna(inplace=True)
+
+    if 'MACD' in indicators:
+        exp1 = data['close'].ewm(span=12, adjust=False).mean()
+        exp2 = data['close'].ewm(span=26, adjust=False).mean()
+        data['MACD'] = exp1 - exp2
+        data['Signal_line'] = data['MACD'].ewm(span=9, adjust=False).mean()
+        data.dropna(inplace=True)
+
+    if 'BOLLINGER_BANDS' in indicators:
+        data['MA20'] = data['close'].rolling(window=20).mean()
+        data['stddev'] = data['close'].rolling(window=20).std()
+        data['Upper_Band'] = data['MA20'] + (data['stddev'] * 2)
+        data['Lower_Band'] = data['MA20'] - (data['stddev'] * 2)
+        data.dropna(inplace=True)
+
+    if 'STOCHASTIC' in indicators:
+        low14 = data['low'].rolling(window=14).min()
+        high14 = data['high'].rolling(window=14).max()
+        data['%K'] = 100 * ((data['close'] - low14) / (high14 - low14))
+        data['%D'] = data['%K'].rolling(window=3).mean()
+        data.dropna(inplace=True)
+
     data['Return'] = data['close'].pct_change()
     data['Strategy_Return'] = data['Return'] * data['Position'].shift(1)
-    
+
     total_return = data['Strategy_Return'].cumsum().iloc[-1]
     num_trades = data['Position'].abs().sum()
     win_rate = (data['Position'] == 1).sum() / num_trades if num_trades > 0 else 0
-    
+
     return data, total_return, num_trades, win_rate
 
 @app.route('/')
@@ -189,16 +224,40 @@ def positions():
     else:
         return f"<h1>Error: {message}</h1>", 500
 
-@app.route('/backtest')
+@app.route('/backtest', methods=['GET', 'POST'])
 def backtest():
+    if request.method == 'POST':
+        pair = request.form['pair']
+        granularity = request.form['granularity']
+        count = int(request.form['count'])
+        indicators = request.form.getlist('indicators')
+    else:
+        pair = 'EUR_USD'
+        granularity = 'D'
+        count = 500
+        indicators = ['SMA']
+
     oanda_api = OandaAPI()
-    data, message = oanda_api.get_historical_data('EUR_USD')
+    data, message = oanda_api.get_historical_data(pair, granularity, count)
     if data is not None:
-        backtest_data, total_return, num_trades, win_rate = backtest_strategy(data)
+        backtest_data, total_return, num_trades, win_rate = backtest_strategy(data, indicators)
         
         fig, ax = plt.subplots()
         ax.plot(backtest_data.index, backtest_data['close'], label='Close Price')
-        ax.plot(backtest_data.index, backtest_data['SMA'], label='SMA')
+        if 'SMA' in indicators:
+            ax.plot(backtest_data.index, backtest_data['SMA'], label='SMA')
+        if 'EMA' in indicators:
+            ax.plot(backtest_data.index, backtest_data['EMA'], label='EMA')
+        if 'RSI' in indicators:
+            ax.plot(backtest_data.index, backtest_data['RSI'], label='RSI')
+        if 'MACD' in indicators:
+            ax.plot(backtest_data.index, backtest_data['MACD'], label='MACD')
+        if 'BOLLINGER_BANDS' in indicators:
+            ax.plot(backtest_data.index, backtest_data['Upper_Band'], label='Upper Bollinger Band')
+            ax.plot(backtest_data.index, backtest_data['Lower_Band'], label='Lower Bollinger Band')
+        if 'STOCHASTIC' in indicators:
+            ax.plot(backtest_data.index, backtest_data['%K'], label='Stochastic %K')
+            ax.plot(backtest_data.index, backtest_data['%D'], label='Stochastic %D')
         
         buy_signals = backtest_data[backtest_data['Position'] == 1]
         ax.plot(buy_signals.index, backtest_data.loc[buy_signals.index, 'close'], '^', markersize=10, color='g', lw=0, label='Buy Signal')
@@ -206,7 +265,7 @@ def backtest():
         sell_signals = backtest_data[backtest_data['Position'] == -1]
         ax.plot(sell_signals.index, backtest_data.loc[sell_signals.index, 'close'], 'v', markersize=10, color='r', lw=0, label='Sell Signal')
         
-        ax.set_title('EUR/USD Backtest')
+        ax.set_title(f'{pair} Backtest')
         ax.set_xlabel('Date')
         ax.set_ylabel('Price')
         ax.legend()
@@ -238,7 +297,7 @@ def optimize():
         best_win_rate = 0
         
         for param in param_range:
-            backtest_data, total_return, num_trades, win_rate = backtest_strategy(data, param)
+            backtest_data, total_return, num_trades, win_rate = backtest_strategy(data, [indicator], param)
             
             if total_return > best_return:
                 best_return = total_return
@@ -253,7 +312,22 @@ def optimize():
             'win_rate': best_win_rate
         }
         
-        return render_template('backtest.html', optimization_results=optimization_results, plot_url=None, total_return=total_return, num_trades=num_trades, win_rate=win_rate)
+        # Plot the P/L chart
+        fig, ax = plt.subplots()
+        ax.plot(backtest_data.index, backtest_data['Strategy_Return'].cumsum(), label='Cumulative P/L')
+        ax.set_title('Optimization P/L')
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Cumulative P/L')
+        ax.legend()
+        
+        img = io.BytesIO()
+        plt.savefig(img, format='png')
+        img.seek(0)
+        plt.close(fig)
+        
+        pl_chart_url = base64.b64encode(img.getvalue()).decode()
+        
+        return render_template('backtest.html', plot_url=None, total_return=best_return, num_trades=best_num_trades, win_rate=best_win_rate, optimization_results=optimization_results, pl_chart_url=pl_chart_url)
     else:
         return f"<h1>Error: {message}</h1>", 500
 
