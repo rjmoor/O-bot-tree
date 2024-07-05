@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import defs
 
 # Configure logging
-logging.basicConfig(filename='./logs/OandaAPIData.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+logging.basicConfig(filename='OandaAPIData.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 class OandaAPI:
     def __init__(self):
@@ -23,13 +23,14 @@ class OandaAPI:
                 wait_time = backoff_factor * (2 ** attempt)
                 logging.warning(f"Request failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {wait_time} seconds...")
                 time.sleep(wait_time)
-        raise requests.exceptions.RequestException("Max retries exceeded")
+        logging.error(f"Max retries exceeded for {url}")
+        return None
 
     def check_account(self):
         url = f"{defs.OANDA_URL}/accounts/{defs.ACCOUNT_ID}"
         try:
             response = self._request_with_retries("GET", url, headers={'Authorization': f'Bearer {defs.API_KEY}'})
-            if response.status_code == 200:
+            if response and response.status_code == 200:
                 account_info = response.json()['account']
                 account_id = account_info['id']
                 balance = account_info['balance']
@@ -78,7 +79,7 @@ class OandaAPI:
         url = f"{defs.OANDA_URL}/accounts/{defs.ACCOUNT_ID}/openTrades"
         try:
             response = self._request_with_retries("GET", url, headers={'Authorization': f'Bearer {defs.API_KEY}'})
-            if response.status_code == 200:
+            if response and response.status_code == 200:
                 return response.json()['trades'], "Open trades retrieved successfully!"
             else:
                 logging.error(f"Failed to retrieve open trades: {response.status_code} {response.text}")
@@ -91,7 +92,7 @@ class OandaAPI:
         url = f"{defs.OANDA_URL}/accounts/{defs.ACCOUNT_ID}/openPositions"
         try:
             response = self._request_with_retries("GET", url, headers={'Authorization': f'Bearer {defs.API_KEY}'})
-            if response.status_code == 200:
+            if response and response.status_code == 200:
                 return response.json()['positions'], "Open positions retrieved successfully!"
             else:
                 logging.error(f"Failed to retrieve open positions: {response.status_code} {response.text}")
@@ -108,7 +109,7 @@ class OandaAPI:
             'price': 'M'
         }
         response = self._request_with_retries("GET", url, headers={'Authorization': f'Bearer {defs.API_KEY}'}, params=params)
-        if response.status_code == 200:
+        if response and response.status_code == 200:
             data = response.json()['candles']
             df = pd.DataFrame.from_records([{
                 'time': candle['time'],
@@ -126,6 +127,9 @@ class OandaAPI:
             df['close'] = pd.to_numeric(df['close'])
             
             return df, "Historical data retrieved successfully!"
-        else:
+        elif response:
             logging.error(f"Failed to retrieve historical data: {response.status_code} {response.text}")
             return None, f"Failed to retrieve historical data: {response.status_code} {response.text}"
+        else:
+            logging.error("Failed to retrieve historical data: No response received")
+            return None, "No response received"

@@ -1,20 +1,25 @@
 import pandas as pd
 
 def backtest_strategy(data, indicators, param=None):
+    data['Signal'] = 0
+    data['Position'] = 0  # Ensure 'Position' column exists
+
     if 'SMA' in indicators:
         if param:
             data['SMA'] = data['close'].rolling(window=param).mean()
         else:
             data['SMA'] = data['close'].rolling(window=50).mean()
         data.dropna(inplace=True)
-        data['Signal'] = 0
+        if data.empty:
+            return data, 0, 0, 0
         data.loc[data['close'] > data['SMA'], 'Signal'] = 1
         data['Position'] = data['Signal'].diff()
 
     if 'EMA' in indicators:
         data['EMA'] = data['close'].ewm(span=50, adjust=False).mean()
         data.dropna(inplace=True)
-        data['Signal'] = 0
+        if data.empty:
+            return data, 0, 0, 0
         data.loc[data['close'] > data['EMA'], 'Signal'] = 1
         data['Position'] = data['Signal'].diff()
 
@@ -25,6 +30,8 @@ def backtest_strategy(data, indicators, param=None):
         rs = gain / loss
         data['RSI'] = 100 - (100 / (1 + rs))
         data.dropna(inplace=True)
+        if data.empty:
+            return data, 0, 0, 0
 
     if 'MACD' in indicators:
         exp1 = data['close'].ewm(span=12, adjust=False).mean()
@@ -32,6 +39,8 @@ def backtest_strategy(data, indicators, param=None):
         data['MACD'] = exp1 - exp2
         data['Signal_line'] = data['MACD'].ewm(span=9, adjust=False).mean()
         data.dropna(inplace=True)
+        if data.empty:
+            return data, 0, 0, 0
 
     if 'BOLLINGER_BANDS' in indicators:
         data['MA20'] = data['close'].rolling(window=20).mean()
@@ -39,6 +48,8 @@ def backtest_strategy(data, indicators, param=None):
         data['Upper_Band'] = data['MA20'] + (data['stddev'] * 2)
         data['Lower_Band'] = data['MA20'] - (data['stddev'] * 2)
         data.dropna(inplace=True)
+        if data.empty:
+            return data, 0, 0, 0
 
     if 'STOCHASTIC' in indicators:
         low14 = data['low'].rolling(window=14).min()
@@ -46,8 +57,12 @@ def backtest_strategy(data, indicators, param=None):
         data['%K'] = 100 * ((data['close'] - low14) / (high14 - low14))
         data['%D'] = data['%K'].rolling(window=3).mean()
         data.dropna(inplace=True)
+        if data.empty:
+            return data, 0, 0, 0
 
     data['Return'] = data['close'].pct_change()
+    if data.empty:
+        return data, 0, 0, 0
     data['Strategy_Return'] = data['Return'] * data['Position'].shift(1)
 
     total_return = data['Strategy_Return'].cumsum().iloc[-1]
