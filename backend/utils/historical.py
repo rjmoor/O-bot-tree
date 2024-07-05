@@ -8,7 +8,7 @@ import schedule
 import time
 
 # Configure logging
-logging.basicConfig(filename='forex_data_generator.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+logging.basicConfig(filename='./logs/forex_data_generator.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 class OandaAPI:
     def __init__(self):

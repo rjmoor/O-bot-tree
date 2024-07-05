@@ -5,3 +5,10 @@ backend/.DS_Store
 backend/OandaAPIData.log
 backend/static/styles/main.css.map
 backend/static/styles/main.scss
+backend/.env
+backend/routes/__init__.py
+backend/routes/__pycache__/__init__.cpython-312.pyc
+/backend/routes/__pycache__
+/backend/routes/__pycache__
+backend/routes/__init__.py
+backend/routes/__pycache__/__init__.cpython-312.pyc
