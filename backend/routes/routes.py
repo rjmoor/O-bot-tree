@@ -17,14 +17,24 @@ def index():
     else:
         return f"<h1>Error: {message}</h1>", 500
 
-@app.route('/trades')
+@app.route('/auto_trades')
 def trades():
     oanda_api = OandaAPI()
     trades, message = oanda_api.get_open_trades()
     if trades:
-        return render_template('trades.html', trades=trades)
+        return render_template('auto_trades.html', trades=trades)
     else:
         return f"<h1>Error: {message}</h1>", 500
+
+@app.route('/manual_trades')
+def trades():
+    oanda_api = OandaAPI()
+    trades, message = oanda_api.get_open_trades()
+    if trades:
+        return render_template('manual_trades.html', trades=trades)
+    else:
+        return f"<h1>Error: {message}</h1>", 500
+
 
 @app.route('/positions')
 def positions():

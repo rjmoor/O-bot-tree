@@ -6,10 +6,11 @@ from datetime import datetime, timedelta, timezone
 
 import matplotlib
 import matplotlib.pyplot as plt
+import mplfinance as mpf
 import pandas as pd
 import requests
 from dateutil.parser import parse
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import Flask, jsonify, render_template, request, send_file, redirect, url_for
 from threading import Thread
 
 import defs
@@ -68,12 +69,65 @@ def index():
     else:
         return f"<h1>Error: {message}</h1>", 500
 
-@app.route('/trades')
-def trades():
+@app.route('/auto_trades')
+def auto_trades():
     oanda_api = OandaAPI()
     trades, message = oanda_api.get_open_trades()
     if trades:
-        return render_template('trades.html', trades=trades)
+        return render_template('auto_trades.html', trades=trades)
+    else:
+        return f"<h1>Error: {message}</h1>", 500
+
+@app.route('/manual_trades', methods=['GET', 'POST'])
+def manual_trades():
+    oanda_api = OandaAPI()
+    instruments = variables.LIVE_TRADING["TRADE_INSTRUMENTS"]
+    selected_instrument = request.args.get('instrument', instruments[0])
+    candlestick_chart = None
+
+    if request.method == 'POST':
+        try:
+            instrument = request.form['instrument']
+            units = int(request.form['units'])
+            side = request.form['side']
+            stop_loss = request.form['stop_loss']
+            take_profit = request.form['take_profit']
+
+            stop_loss = float(stop_loss) if stop_loss else None
+            take_profit = float(take_profit) if take_profit else None
+
+            trade, message = oanda_api.place_trade(instrument, units, side, stop_loss, take_profit)
+            if trade:
+                return redirect(url_for('manual_trades', instrument=instrument))
+            else:
+                return f"<h1>Error: {message}</h1>", 500
+        except KeyError as e:
+            logging.error(f"Missing form data: {e}")
+            return f"<h1>Error: Missing form data - {e}</h1>", 400
+
+    # Get historical data and generate candlestick chart
+    data, message = oanda_api.get_historical_data(selected_instrument, 'H1', 100)
+    if data is not None:
+        fig, ax = plt.subplots()
+        mpf.plot(data, type='candle', style='charles', ax=ax)
+        img = io.BytesIO()
+        plt.savefig(img, format='png')
+        img.seek(0)
+        plt.close(fig)
+        candlestick_chart = base64.b64encode(img.getvalue()).decode()
+
+    trades, message = oanda_api.get_open_trades()
+    if trades is not None:
+        return render_template('manual_trades.html', trades=trades, instruments=instruments, selected_instrument=selected_instrument, candlestick_chart=candlestick_chart)
+    else:
+        return render_template('manual_trades.html', trades=[], instruments=instruments, selected_instrument=selected_instrument, candlestick_chart=candlestick_chart, error=message)
+
+@app.route('/close_trade/<trade_id>', methods=['POST'])
+def close_trade(trade_id):
+    oanda_api = OandaAPI()
+    trade, message = oanda_api.close_trade(trade_id)
+    if trade:
+        return redirect(url_for('manual_trades'))
     else:
         return f"<h1>Error: {message}</h1>", 500
 
@@ -132,7 +186,7 @@ def backtest():
         ax.set_ylabel('Price')
         ax.legend()
         
-        img = io.BytesIO()
+        img = io.Bytes.IO()
         plt.savefig(img, format='png')
         img.seek(0)
         plt.close(fig)
@@ -189,13 +243,18 @@ def plot(plot_type):
         ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
         ax.axis('equal')
         
-        img = io.BytesIO()
+        img = io.Bytes.IO()
         plt.savefig(img, format='png')
         img.seek(0)
         plt.close(fig)
         return send_file(img, mimetype='image/png')
     else:
         return "<h1>Plot type not supported</h1>", 400
+
+@app.route('/settings')
+def settings():
+    # Placeholder for settings route
+    return render_template('settings.html')
 
 if __name__ == '__main__':
     trade_bot.start()

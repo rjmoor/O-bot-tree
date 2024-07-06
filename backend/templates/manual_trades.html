@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Trades</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Navigation</h2>
+            <ul>
+                <li><a href="{{ url_for('index') }}">Overview</a></li>
+                <li><a href="{{ url_for('auto_trades') }}">Auto Trades</a></li>
+                <li><a href="{{ url_for('manual_trades') }}">Manual Trades</a></li>
+                <li><a href="{{ url_for('positions') }}">Open Positions</a></li>
+                <li><a href="{{ url_for('backtest') }}">Backtest</a></li>
+                <li><a href="{{ url_for('settings') }}">Settings</a></li>
+            </ul>
+        </div>
+        <div class="content">
+            <h1>Manual Trades</h1>
+            <form method="get" action="{{ url_for('manual_trades') }}">
+                <label for="instrument">Instrument:</label>
+                <select name="instrument" id="instrument" onchange="this.form.submit()">
+                    {% for instrument in instruments %}
+                        <option value="{{ instrument }}" {% if instrument == selected_instrument %}selected{% endif %}>{{ instrument }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            <form method="post" action="{{ url_for('manual_trades') }}">
+                <input type="hidden" name="instrument" value="{{ selected_instrument }}">
+                <label for="units">Units:</label>
+                <input type="number" name="units" id="units" required>
+                <label for="side">Side:</label>
+                <select name="side" id="side">
+                    <option value="buy">Buy</option>
+                    <option value="sell">Sell</option>
+                </select>
+                <label for="stop_loss">Stop Loss:</label>
+                <input type="number" step="0.0001" name="stop_loss" id="stop_loss">
+                <label for="take_profit">Take Profit:</label>
+                <input type="number" step="0.0001" name="take_profit" id="take_profit">
+                <button type="submit">Place Trade</button>
+            </form>
+            <h2>Open Trades</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Trade ID</th>
+                        <th>Instrument</th>
+                        <th>Units</th>
+                        <th>Side</th>
+                        <th>Price</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for trade in trades %}
+                        <tr>
+                            <td>{{ trade['id'] }}</td>
+                            <td>{{ trade['instrument'] }}</td>
+                            <td>{{ trade['currentUnits'] }}</td>
+                            <td>{{ 'Buy' if trade['currentUnits'] > 0 else 'Sell' }}</td>
+                            <td>{{ trade['price'] }}</td>
+                            <td>
+                                <form method="post" action="{{ url_for('close_trade', trade_id=trade['id']) }}">
+                                    <button type="submit">Close Trade</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <h2>{{ selected_instrument }} Candlestick Chart</h2>
+            {% if candlestick_chart %}
+                <img src="data:image/png;base64,{{ candlestick_chart }}" alt="Candlestick Chart">
+            {% else %}
+                <p>No data available for {{ selected_instrument }}</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

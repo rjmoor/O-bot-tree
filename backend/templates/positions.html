@@ -13,10 +13,11 @@
             <ul>
                 <li><a href="{{ url_for('index') }}">Overview</a></li>
                 <li><a href="#">Account Settings</a></li>
-                <li><a href="{{ url_for('trades') }}">Open Trades</a></li>
+                <li><a href="{{ url_for('manual_trades') }}">Manual Trades</a></li>
+                <li><a href="{{ url_for('auto_trades') }}">View Auto Trades</a></li>
                 <li><a href="{{ url_for('positions') }}">Open Positions</a></li>
                 <li><a href="{{ url_for('backtest') }}">Backtest</a></li>
-                <li><a href="#">Settings</a></li>
+                <li><a href="{{ url_for('settings') }}">Setup Backtest</a></li>
             </ul>
         </div>
         <div class="content">
