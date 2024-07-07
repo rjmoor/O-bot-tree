@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade Response</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="content">
+            {% if success %}
+                <h1>Trade Successful</h1>
+                <p>{{ message }}</p>
+                <p>Your trade has been placed successfully.</p>
+            {% else %}
+                <h1>Trade Error</h1>
+                <p>{{ message }}</p>
+                <p>There was an error placing your trade. Please try again.</p>
+            {% endif %}
+            <a href="{{ url_for('manual_trades') }}" class="btn">Back to Manual Trades</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -2,10 +2,12 @@ import logging
 import requests
 import pandas as pd
 from datetime import datetime, timedelta, timezone
+import json
+import time
 import defs
 
 # Configure logging
-logging.basicConfig(filename='OandaAPIData.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+logging.basicConfig(filename='./logs/OandaAPIData.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 class OandaAPI:
     def __init__(self):
@@ -30,6 +32,9 @@ class OandaAPI:
         url = f"{defs.OANDA_URL}/accounts/{defs.ACCOUNT_ID}"
         try:
             response = self._request_with_retries("GET", url, headers={'Authorization': f'Bearer {defs.API_KEY}'})
+            if response is None:
+                logging.error("No response received for check_account")
+                return None, "No response received"
             if response and response.status_code == 200:
                 account_info = response.json()['account']
                 account_id = account_info['id']
@@ -79,7 +84,10 @@ class OandaAPI:
         url = f"{defs.OANDA_URL}/accounts/{defs.ACCOUNT_ID}/openTrades"
         try:
             response = self._request_with_retries("GET", url, headers={'Authorization': f'Bearer {defs.API_KEY}'})
-            if response and response.status_code == 200:
+            if response is None:
+                logging.error("No response received for get_open_trades")
+                return None, "No response received"
+            if response.status_code == 200:
                 return response.json()['trades'], "Open trades retrieved successfully!"
             else:
                 logging.error(f"Failed to retrieve open trades: {response.status_code} {response.text}")
@@ -92,7 +100,10 @@ class OandaAPI:
         url = f"{defs.OANDA_URL}/accounts/{defs.ACCOUNT_ID}/openPositions"
         try:
             response = self._request_with_retries("GET", url, headers={'Authorization': f'Bearer {defs.API_KEY}'})
-            if response and response.status_code == 200:
+            if response is None:
+                logging.error("No response received for get_open_positions")
+                return None, "No response received"
+            if response.status_code == 200:
                 return response.json()['positions'], "Open positions retrieved successfully!"
             else:
                 logging.error(f"Failed to retrieve open positions: {response.status_code} {response.text}")
@@ -109,7 +120,10 @@ class OandaAPI:
             'price': 'M'
         }
         response = self._request_with_retries("GET", url, headers={'Authorization': f'Bearer {defs.API_KEY}'}, params=params)
-        if response and response.status_code == 200:
+        if response is None:
+            logging.error("No response received for get_historical_data")
+            return None, "No response received"
+        if response.status_code == 200:
             data = response.json()['candles']
             df = pd.DataFrame.from_records([{
                 'time': candle['time'],
@@ -133,3 +147,74 @@ class OandaAPI:
         else:
             logging.error("Failed to retrieve historical data: No response received")
             return None, "No response received"
+
+    def set_stop_loss(self, price):
+        return {"price": str(price)}
+
+    def set_take_profit(self, price):
+        return {"price": str(price)}
+    
+    def place_trade(self, instrument, units, side, order_type, price=None, stop_loss=None, take_profit=None, trailing_stop_loss=None):
+        url = f"{defs.OANDA_URL}/accounts/{defs.ACCOUNT_ID}/orders"
+        order = {
+            "units": str(units) if side == 'buy' else str(-units),
+            "instrument": instrument,
+            "timeInForce": "GTC",
+            "type": order_type,
+            "positionFill": "DEFAULT"
+        }
+        if price:
+            order["price"] = str(price)
+        if stop_loss:
+            order["stopLossOnFill"] = self.set_stop_loss(stop_loss)
+        if take_profit:
+            order["takeProfitOnFill"] = self.set_take_profit(take_profit)
+
+        data = {"order": order}
+        try:
+            response = self._request_with_retries("POST", url, headers={'Authorization': f'Bearer {defs.API_KEY}'}, data=json.dumps(data))
+            if response is None:
+                logging.error("No response received for place_trade")
+                return None, "No response received"
+            if response.status_code == 201:
+                logging.info("Trade placed successfully!")
+                return response.json(), "Trade placed successfully!"
+            else:
+                logging.error(f"Failed to place trade: {response.status_code} {response.text}")
+                return None, f"Failed to place trade: {response.status_code} {response.text}"
+        except Exception as e:
+            logging.error(f"Error placing trade: {e}")
+            return None, str(e)
+
+    def close_trade(self, trade_id):
+        url = f"{defs.OANDA_URL}/accounts/{defs.ACCOUNT_ID}/trades/{trade_id}/close"
+        try:
+            response = self._request_with_retries("PUT", url, headers={'Authorization': f'Bearer {defs.API_KEY}'})
+            if response is None:
+                logging.error("No response received for close_trade")
+                return None, "No response received"
+            if response.status_code == 200:
+                logging.info("Trade closed successfully!")
+                return response.json(), "Trade closed successfully!"
+            else:
+                logging.error(f"Failed to close trade: {response.status_code} {response.text}")
+                return None, f"Failed to close trade: {response.status_code} {response.text}"
+        except Exception as e:
+            logging.error(f"Error closing trade: {e}")
+            return None, str(e)
+
+    def close_all_trades(self):
+        open_positions, message = self.get_open_positions()
+        if not open_positions:
+            logging.info("No open positions to close.")
+            return None, "No open positions to close."
+
+        closed_trades = []
+        for position in open_positions['positions']:
+            side = 'buy' if int(position['long']['units']) < 0 else 'sell'
+            trade_id = position['long']['tradeIDs'][0] if side == 'sell' else position['short']['tradeIDs'][0]
+            close_response, close_message = self.close_trade(trade_id)
+            closed_trades.append((trade_id, close_message))
+
+        logging.info("All open trades have been closed.")
+        return closed_trades, "All open trades have been closed."
