@@ -71,5 +71,38 @@ body {
 .content table tr:nth-child(even) {
   background-color: #2f2f2f;
 }
+.content .form-section {
+  background-color: #1e1e1e;
+  padding: 20px;
+  margin-top: 20px;
+  border-radius: 10px;
+}
+.content .form-section label {
+  display: block;
+  margin-top: 10px;
+}
+.content .form-section input, .content .form-section select {
+  display: block;
+  margin-top: 5px;
+}
+.content .indicator-checkboxes {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 20px;
+}
+.content .indicator-fields {
+  display: none;
+  background-color: #1a1a1a;
+  border: 1px solid #555;
+  padding: 10px;
+  margin-top: 10px;
+}
+.content .indicator-fields label {
+  margin-right: 10px;
+  color: white;
+}
+.content .indicator-fields input {
+  margin-right: 10px;
+}
 
 /*# sourceMappingURL=main.css.map */

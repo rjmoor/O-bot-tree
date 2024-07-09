@@ -6,6 +6,16 @@
     <title>Manual Trades</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <style>
+        .indicator-checkboxes {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+        .indicator-fields {
+            display: none;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -30,29 +40,97 @@
                     {% endfor %}
                 </select>
             </form>
-            <form method="post" action="{{ url_for('manual_trades') }}">
-                <input type="hidden" name="instrument" value="{{ selected_instrument }}">
-                <label for="units">Units:</label>
-                <input type="number" name="units" id="units" required>
-                <label for="side">Side:</label>
-                <select name="side" id="side">
-                    <option value="buy">Buy</option>
-                    <option value="sell">Sell</option>
-                </select>
-                <label for="order_type">Order Type:</label>
-                <select name="order_type" id="order_type">
-                    <option value="MARKET">Market</option>
-                    <option value="LIMIT">Limit</option>
-                    <option value="STOP">Stop</option>
-                </select>
-                <label for="price">Price (for Limit/Stop):</label>
-                <input type="number" step="0.0001" name="price" id="price">
-                <label for="stop_loss">Stop Loss:</label>
-                <input type="number" step="0.0001" name="stop_loss" id="stop_loss">
-                <label for="take_profit">Take Profit:</label>
-                <input type="number" step="0.0001" name="take_profit" id="take_profit">
-                <button type="submit">Place Trade</button>
-            </form>
+            <div class="form-section">
+                <form method="post" action="{{ url_for('manual_trades') }}">
+                    <input type="hidden" name="instrument" value="{{ selected_instrument }}">
+                    <label for="units">Units:</label>
+                    <input type="number" name="units" id="units" required>
+                    <label for="side">Side:</label>
+                    <select name="side" id="side">
+                        <option value="buy">Buy</option>
+                        <option value="sell">Sell</option>
+                    </select>
+                    <label for="order_type">Order Type:</label>
+                    <select name="order_type" id="order_type">
+                        <option value="MARKET">Market</option>
+                        <option value="LIMIT">Limit</option>
+                        <option value="STOP">Stop</option>
+                    </select>
+                    <label for="price">Price (for Limit/Stop):</label>
+                    <input type="number" step="0.0001" name="price" id="price">
+                    <label for="stop_loss">Stop Loss:</label>
+                    <input type="number" step="0.0001" name="stop_loss" id="stop_loss">
+                    <label for="take_profit">Take Profit:</label>
+                    <input type="number" step="0.0001" name="take_profit" id="take_profit">
+                    <div class="indicator-checkboxes">
+                        <div>
+                            <input type="checkbox" id="SMA" name="indicators" value="SMA" onchange="toggleFields('SMA')">
+                            <label for="SMA">SMA</label>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="EMA" name="indicators" value="EMA" onchange="toggleFields('EMA')">
+                            <label for="EMA">EMA</label>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="RSI" name="indicators" value="RSI" onchange="toggleFields('RSI')">
+                            <label for="RSI">RSI</label>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="MACD" name="indicators" value="MACD" onchange="toggleFields('MACD')">
+                            <label for="MACD">MACD</label>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="BOLLINGER_BANDS" name="indicators" value="BOLLINGER_BANDS" onchange="toggleFields('BOLLINGER_BANDS')">
+                            <label for="BOLLINGER_BANDS">Bollinger Bands</label>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="STOCHASTIC" name="indicators" value="STOCHASTIC" onchange="toggleFields('STOCHASTIC')">
+                            <label for="STOCHASTIC">Stochastic</label>
+                        </div>
+                    </div>
+                    <div id="SMA-fields" class="indicator-fields">
+                        <label for="SMA-period">SMA Period:</label>
+                        <input type="number" name="SMA-period" id="SMA-period">
+                        <label for="SMA-period">SMA Fast Period:</label>
+                        <input type="number" name="SMA-fast-period" id="SMA-fast-period">
+                        <label for="SMA-period">SMA Slow Period:</label>
+                        <input type="number" name="SMA-slow-period" id="SMA-slow-period">
+                    </div>
+                    <div id="EMA-fields" class="indicator-fields">
+                        <label for="EMA-period">EMA Period:</label>
+                        <input type="number" name="EMA-period" id="EMA-period">
+                        <label for="EMA-period">EMA Fast Period:</label>
+                        <input type="number" name="EMA-fast-period" id="EMA-fast-period">
+                        <label for="EMA-period">EMA Slow Period:</label>
+                        <input type="number" name="EMA-slow-period" id="EMA-slow-period">
+                    </div>
+                    <div id="RSI-fields" class="indicator-fields">
+                        <label for="RSI-period">RSI Period:</label>
+                        <input type="number" name="RSI-period" id="RSI-period">
+                    </div>
+                    <div id="MACD-fields" class="indicator-fields">
+                        <label for="MACD-fast-period">MACD Fast Period:</label>
+                        <input type="number" name="MACD-fast-period" id="MACD-fast-period">
+                        <label for="MACD-slow-period">MACD Slow Period:</label>
+                        <input type="number" name="MACD-slow-period" id="MACD-slow-period">
+                        <label for="MACD-signal-period">MACD Signal Period:</label>
+                        <input type="number" name="MACD-signal-period" id="MACD-signal-period">
+                    </div>
+                    <div id="BOLLINGER_BANDS-fields" class="indicator-fields">
+                        <label for="BOLLINGER_BANDS-period">Bollinger Bands Period:</label>
+                        <input type="number" name="BOLLINGER_BANDS-period" id="BOLLINGER_BANDS-period">
+                        <label for="BOLLINGER_BANDS-deviation">Bollinger Bands Deviation:</label>
+                        <input type="number" name="BOLLINGER_BANDS-deviation" id="BOLLINGER_BANDS-deviation">
+                    </div>
+                    <div id="STOCHASTIC-fields" class="indicator-fields">
+                        <label for="STOCHASTIC-K-period">%K Period:</label>
+                        <input type="number" name="STOCHASTIC-K-period" id="STOCHASTIC-K-period">
+                        <label for="STOCHASTIC-D-period">%D Period:</label>
+                        <input type="number" name="STOCHASTIC-D-period" id="STOCHASTIC-D-period">
+                    </div>
+                    <button type="submit">Place Trade</button>
+                </form>
+            </div>
             <h2>Open Trades</h2>
             <table>
                 <thead>
@@ -99,6 +177,15 @@
                     "allow_symbol_change": true,
                     "container_id": "tradingview_chart"
                 });
+
+                function toggleFields(indicator) {
+                    var fields = document.getElementById(indicator + '-fields');
+                    if (fields.style.display === 'none' || fields.style.display === '') {
+                        fields.style.display = 'block';
+                    } else {
+                        fields.style.display = 'none';
+                    }
+                }
             </script>
         </div>
     </div>
