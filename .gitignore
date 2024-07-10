@@ -15,3 +15,9 @@ backend/routes/__pycache__/__init__.cpython-312.pyc
 backend/.env
 backend/routes/__init__.py
 backend/utils/indicators/__init__.py
+backend/backtest/__init__.py
+backend/indicators/__init__.py
+/backend/indicators/__pycache__
+backend/optimization/__init__.py
+backend/strategies/__init__.py
+/backend/utils/__pycache__

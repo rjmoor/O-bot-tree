@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from ..oanda_api import OandaAPIData
+from ..oanda_api.oanda_api import OandaAPIData
 
 oanda_bp = Blueprint('oanda', __name__)
 oanda_api = OandaAPIData()

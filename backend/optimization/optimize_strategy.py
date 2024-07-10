@@ -1,7 +1,7 @@
 # optimization.py
 
 import pandas as pd
-from backtest import backtest_strategy
+from backend.backtest.backtest_strategy import backtest_strategy
 from strategies import SMACrossoverStrategy, EMACrossoverStrategy
 
 def optimize_strategy(data: pd.DataFrame, strategy_class, param_ranges: dict) -> dict:

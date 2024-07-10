@@ -2,9 +2,9 @@ import base64
 import io
 
 import matplotlib.pyplot as plt
-from backtest import backtest_strategy, optimize_strategy
+from backend.backtest.backtest_strategy import backtest_strategy, optimize_strategy
 from flask import Flask, render_template, request, send_file
-from oanda_api import OandaAPI
+from backend.oanda_api.oanda_api import OandaAPI
 
 app = Flask(__name__)
 

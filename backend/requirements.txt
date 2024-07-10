@@ -1,0 +1,6 @@
+flask
+flask-assets
+matplotlib
+mplfinance
+pandas
+requests

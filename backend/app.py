@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from threading import Thread
 
+from backend.backtest.backtest_strategy import backtest_strategy
 import defs
 import matplotlib
 import matplotlib.pyplot as plt
@@ -12,132 +13,15 @@ import mplfinance as mpf
 import pandas as pd
 import requests
 import variables
-from backtest import backtest_strategy, optimize_strategy
+from backtest import optimize_strategy
 from dateutil.parser import parse
 from flask import (Flask, jsonify, redirect, render_template, request, send_file, url_for)
 from flask_assets import Bundle, Environment
-from strategies import SMAStrategy, EMAStrategy, RSIStrategy
-from optimization import optimize_strategy
-from oanda_api import OandaAPI
-
-matplotlib.use("Agg")
-
-# Configure logging
-logging.basicConfig(
-    filename="./logs/OandaAPIData.log",
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s:%(message)s",
-)
-
-app = Flask(__name__)
-
-assets = Environment(app)
-scss = Bundle('static/styles/main.scss', filters='pyscss', output='static/styles/main.css')
-assets.register('scss_all', scss)
-
-class TradeBot:
-    def __init__(self):
-        self.api = OandaAPI()
-        self.running = False
-
-    def start(self):
-        self.running = True
-        self.thread = Thread(target=self.run)
-        self.thread.start()
-
-    def stop(self):
-        self.running = False
-        self.thread.join()
-
-    def run(self):
-        while self.running:
-            for pair in variables.LIVE_TRADING["TRADE_INSTRUMENTS"]:
-                granularity = variables.LIVE_TRADING["TRADING_GRANULARITY"]
-                count = variables.LIVE_TRADING["TRADING_COUNT"]
-                data, message = self.api.get_historical_data(pair, granularity, count)
-                if data is not None:
-                    for indicator, params in variables.OPTIMIZATION_RANGES.items():
-                        param_range = params[next(iter(params))]
-                        optimization_results, _ = optimize_strategy(
-                            data, indicator, param_range
-                        )
-                        self.execute_trade(pair, optimization_results)
-                else:
-                    logging.error(
-                        f"Failed to get historical data for {pair}: {message}"
-                    )
-            time.sleep(3600)  # Run every hour
-
-
-Sure, let's create a separate MACDIndicator class that will generate signals based on the MACD indicator. This class will be designed to be used as part of a state machine or combined with other indicators to provide a comprehensive trading signal.
-
-1. Create the MACDIndicator Class
-Here is the class definition for the MACDIndicator:
-
-python
-Copy code
-# macd_indicator.py
-
-import pandas as pd
-
-class MACDIndicator:
-    def __init__(self, short_window=12, long_window=26, signal_window=9):
-        self.short_window = short_window
-        self.long_window = long_window
-        self.signal_window = signal_window
-
-    def calculate_macd(self, data: pd.DataFrame) -> pd.DataFrame:
-        # Calculate the short-term EMA
-        data['EMA_short'] = data['close'].ewm(span=self.short_window, adjust=False).mean()
-        # Calculate the long-term EMA
-        data['EMA_long'] = data['close'].ewm(span=self.long_window, adjust=False).mean()
-        # Calculate the MACD line
-        data['MACD'] = data['EMA_short'] - data['EMA_long']
-        # Calculate the Signal line
-        data['Signal'] = data['MACD'].ewm(span=self.signal_window, adjust=False).mean()
-        # Calculate the Histogram
-        data['Histogram'] = data['MACD'] - data['Signal']
-        return data
-
-    def generate_signal(self, data: pd.DataFrame) -> pd.DataFrame:
-        data = self.calculate_macd(data)
-        data['MACD_Signal'] = 0
-        # Generate signals: 1 for buy, -1 for sell
-        data['MACD_Signal'] = data.apply(
-            lambda row: 1 if row['MACD'] > row['Signal'] else (-1 if row['MACD'] < row['Signal'] else 0), axis=1
-        )
-        return data
-
-    def check_green_light(self, data: pd.DataFrame) -> bool:
-        # Ensure the data has been processed with generate_signal
-        if 'MACD_Signal' not in data.columns:
-            data = self.generate_signal(data)
-        
-        # Check for green light condition
-        latest_signal = data.iloc[-1]['MACD_Signal']
-        return latest_signal == 1
-2. Integrate the MACDIndicator into the State Machine
-Next, we will integrate the MACDIndicator class into your app.py as part of the TradeBot class.
-
-python
-Copy code
-import base64
-import io
-import logging
-import time
-from datetime import datetime, timedelta, timezone
-from threading import Thread
-
-import matplotlib
-import matplotlib.pyplot as plt
-import mplfinance as mpf
-import pandas as pd
-from flask import Flask, jsonify, redirect, render_template, request, send_file, url_for
-from flask_assets import Bundle, Environment
-from strategies import SMAStrategy, EMAStrategy, RSIStrategy, SMACrossoverStrategy, EMACrossoverStrategy
+from utils.indicators.strategies import SMAStrategy, EMAStrategy, RSIStrategy, SMACrossoverStrategy, EMACrossoverStrategy
 from macd_indicator import MACDIndicator
+from stochastic_indicator import StochasticIndicator  # Import StochasticIndicator
 from optimization import optimize_strategy
-from oanda_api import OandaAPI
+from backend.oanda_api.oanda_api import OandaAPI
 
 matplotlib.use("Agg")
 
@@ -159,6 +43,7 @@ class TradeBot:
         self.api = OandaAPI()
         self.running = False
         self.macd_indicator = MACDIndicator()  # Initialize MACDIndicator
+        self.stochastic_indicator = StochasticIndicator()  # Initialize StochasticIndicator
 
     def start(self):
         self.running = True
@@ -190,13 +75,16 @@ class TradeBot:
 
     def execute_trade(self, pair, optimization_results, data):
         # Implement trading logic here using the best parameters from optimization_results
-        green_light = self.macd_indicator.check_green_light(data)
-        if green_light:
-            # Example: Execute trade if green light is on
+        macd_state = self.macd_indicator.check_green_light(data)
+        stochastic_state = self.stochastic_indicator.get_signal_state(data)
+        
+        if macd_state and stochastic_state == 'green':
+            # Example: Execute trade if both MACD and Stochastic are green
             print(f"Green light for {pair}: Execute trade")
+        elif stochastic_state == 'yellow':
+            print(f"Yellow light for {pair}: Setup active, prepare to trade")
         else:
-            print(f"No green light for {pair}: Do not trade")
-            
+            print(f"Red light for {pair}: Not favorable to trade")
 
 trade_bot = TradeBot()
 
@@ -437,10 +325,8 @@ def backtest():
 
 @app.route("/optimize", methods=["POST"])
 def optimize():
-    indicator = request.form["indicator"]
-    parameter = request.form["parameter"]
     strategy_name = request.form["strategy"]
-    param_range = list(map(int, request.form["range"].split(",")))
+    param_range = request.form["range"].split(",")
 
     oanda_api = OandaAPI()
     data, message = oanda_api.get_historical_data("EUR_USD", "D", 500)
@@ -461,34 +347,10 @@ def optimize():
             slow_range = list(map(int, param_range[1].split("-")))
             results = optimize_strategy(data, EMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
 
-        # Plot the P/L chart
-        fig, ax = plt.subplots()
-        ax.plot(
-            backtest_data.index,
-            backtest_data["Strategy_Return"].cumsum(),
-            label="Cumulative P/L",
-        )
-        ax.set_title("Optimization P/L")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Cumulative P/L")
-        ax.legend()
-
-        img = io.BytesIO()
-        plt.savefig(img, format="png")
-        img.seek(0)
-        plt.close(fig)
-
-        pl_chart_url = base64.b64encode(img.getvalue()).decode()
-
         return render_template(
             "optimization_results.html",
             best_params=results['best_params'],
-            performance=results['performance'],
-            total_return=optimization_results["total_return"],
-            num_trades=optimization_results["num_trades"],
-            win_rate=optimization_results["win_rate"],
-            optimization_results=optimization_results,
-            pl_chart_url=pl_chart_url,
+            performance=results['performance']
         )
     else:
         return f"<h1>Error: {message}</h1>", 500
