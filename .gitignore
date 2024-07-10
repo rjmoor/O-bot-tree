@@ -14,3 +14,4 @@ backend/routes/__init__.py
 backend/routes/__pycache__/__init__.cpython-312.pyc
 backend/.env
 backend/routes/__init__.py
+backend/utils/indicators/__init__.py

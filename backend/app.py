@@ -68,10 +68,135 @@ class TradeBot:
                     )
             time.sleep(3600)  # Run every hour
 
-    def execute_trade(self, pair, optimization_results):
-        # Implement trading logic here using the best parameters from optimization_results
-        pass
 
+Sure, let's create a separate MACDIndicator class that will generate signals based on the MACD indicator. This class will be designed to be used as part of a state machine or combined with other indicators to provide a comprehensive trading signal.
+
+1. Create the MACDIndicator Class
+Here is the class definition for the MACDIndicator:
+
+python
+Copy code
+# macd_indicator.py
+
+import pandas as pd
+
+class MACDIndicator:
+    def __init__(self, short_window=12, long_window=26, signal_window=9):
+        self.short_window = short_window
+        self.long_window = long_window
+        self.signal_window = signal_window
+
+    def calculate_macd(self, data: pd.DataFrame) -> pd.DataFrame:
+        # Calculate the short-term EMA
+        data['EMA_short'] = data['close'].ewm(span=self.short_window, adjust=False).mean()
+        # Calculate the long-term EMA
+        data['EMA_long'] = data['close'].ewm(span=self.long_window, adjust=False).mean()
+        # Calculate the MACD line
+        data['MACD'] = data['EMA_short'] - data['EMA_long']
+        # Calculate the Signal line
+        data['Signal'] = data['MACD'].ewm(span=self.signal_window, adjust=False).mean()
+        # Calculate the Histogram
+        data['Histogram'] = data['MACD'] - data['Signal']
+        return data
+
+    def generate_signal(self, data: pd.DataFrame) -> pd.DataFrame:
+        data = self.calculate_macd(data)
+        data['MACD_Signal'] = 0
+        # Generate signals: 1 for buy, -1 for sell
+        data['MACD_Signal'] = data.apply(
+            lambda row: 1 if row['MACD'] > row['Signal'] else (-1 if row['MACD'] < row['Signal'] else 0), axis=1
+        )
+        return data
+
+    def check_green_light(self, data: pd.DataFrame) -> bool:
+        # Ensure the data has been processed with generate_signal
+        if 'MACD_Signal' not in data.columns:
+            data = self.generate_signal(data)
+        
+        # Check for green light condition
+        latest_signal = data.iloc[-1]['MACD_Signal']
+        return latest_signal == 1
+2. Integrate the MACDIndicator into the State Machine
+Next, we will integrate the MACDIndicator class into your app.py as part of the TradeBot class.
+
+python
+Copy code
+import base64
+import io
+import logging
+import time
+from datetime import datetime, timedelta, timezone
+from threading import Thread
+
+import matplotlib
+import matplotlib.pyplot as plt
+import mplfinance as mpf
+import pandas as pd
+from flask import Flask, jsonify, redirect, render_template, request, send_file, url_for
+from flask_assets import Bundle, Environment
+from strategies import SMAStrategy, EMAStrategy, RSIStrategy, SMACrossoverStrategy, EMACrossoverStrategy
+from macd_indicator import MACDIndicator
+from optimization import optimize_strategy
+from oanda_api import OandaAPI
+
+matplotlib.use("Agg")
+
+# Configure logging
+logging.basicConfig(
+    filename="./logs/OandaAPIData.log",
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s:%(message)s",
+)
+
+app = Flask(__name__)
+
+assets = Environment(app)
+scss = Bundle('static/styles/main.scss', filters='pyscss', output='static/styles/main.css')
+assets.register('scss_all', scss)
+
+class TradeBot:
+    def __init__(self):
+        self.api = OandaAPI()
+        self.running = False
+        self.macd_indicator = MACDIndicator()  # Initialize MACDIndicator
+
+    def start(self):
+        self.running = True
+        self.thread = Thread(target=self.run)
+        self.thread.start()
+
+    def stop(self):
+        self.running = False
+        self.thread.join()
+
+    def run(self):
+        while self.running:
+            for pair in variables.LIVE_TRADING["TRADE_INSTRUMENTS"]:
+                granularity = variables.LIVE_TRADING["TRADING_GRANULARITY"]
+                count = variables.LIVE_TRADING["TRADING_COUNT"]
+                data, message = self.api.get_historical_data(pair, granularity, count)
+                if data is not None:
+                    for indicator, params in variables.OPTIMIZATION_RANGES.items():
+                        param_range = params[next(iter(params))]
+                        optimization_results, _ = optimize_strategy(
+                            data, indicator, param_range
+                        )
+                        self.execute_trade(pair, optimization_results, data)
+                else:
+                    logging.error(
+                        f"Failed to get historical data for {pair}: {message}"
+                    )
+            time.sleep(3600)  # Run every hour
+
+    def execute_trade(self, pair, optimization_results, data):
+        # Implement trading logic here using the best parameters from optimization_results
+        green_light = self.macd_indicator.check_green_light(data)
+        if green_light:
+            # Example: Execute trade if green light is on
+            print(f"Green light for {pair}: Execute trade")
+        else:
+            print(f"No green light for {pair}: Do not trade")
+            
 
 trade_bot = TradeBot()
 
@@ -318,20 +443,23 @@ def optimize():
     param_range = list(map(int, request.form["range"].split(",")))
 
     oanda_api = OandaAPI()
-    data, message = oanda_api.get_historical_data("EUR_USD")
+    data, message = oanda_api.get_historical_data("EUR_USD", "D", 500)
 
     if data is not None:
-        optimization_results, backtest_data = optimize_strategy(
-            data, indicator, param_range
-        )
-    
-    if data is not None:
         if strategy_name == 'SMA':
-            results = optimize_strategy(data, SMAStrategy, param_range)
+            results = optimize_strategy(data, SMAStrategy, {'single': list(map(int, param_range))})
         elif strategy_name == 'EMA':
-            results = optimize_strategy(data, EMAStrategy, param_range)
+            results = optimize_strategy(data, EMAStrategy, {'single': list(map(int, param_range))})
         elif strategy_name == 'RSI':
-            results = optimize_strategy(data, RSIStrategy, param_range)
+            results = optimize_strategy(data, RSIStrategy, {'single': list(map(int, param_range))})
+        elif strategy_name == 'SMACrossover':
+            fast_range = list(map(int, param_range[0].split("-")))
+            slow_range = list(map(int, param_range[1].split("-")))
+            results = optimize_strategy(data, SMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
+        elif strategy_name == 'EMACrossover':
+            fast_range = list(map(int, param_range[0].split("-")))
+            slow_range = list(map(int, param_range[1].split("-")))
+            results = optimize_strategy(data, EMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
 
         # Plot the P/L chart
         fig, ax = plt.subplots()
