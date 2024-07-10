@@ -16,6 +16,8 @@ from backtest import backtest_strategy, optimize_strategy
 from dateutil.parser import parse
 from flask import (Flask, jsonify, redirect, render_template, request, send_file, url_for)
 from flask_assets import Bundle, Environment
+from strategies import SMAStrategy, EMAStrategy, RSIStrategy
+from optimization import optimize_strategy
 from oanda_api import OandaAPI
 
 matplotlib.use("Agg")
@@ -312,6 +314,7 @@ def backtest():
 def optimize():
     indicator = request.form["indicator"]
     parameter = request.form["parameter"]
+    strategy_name = request.form["strategy"]
     param_range = list(map(int, request.form["range"].split(",")))
 
     oanda_api = OandaAPI()
@@ -321,6 +324,14 @@ def optimize():
         optimization_results, backtest_data = optimize_strategy(
             data, indicator, param_range
         )
+    
+    if data is not None:
+        if strategy_name == 'SMA':
+            results = optimize_strategy(data, SMAStrategy, param_range)
+        elif strategy_name == 'EMA':
+            results = optimize_strategy(data, EMAStrategy, param_range)
+        elif strategy_name == 'RSI':
+            results = optimize_strategy(data, RSIStrategy, param_range)
 
         # Plot the P/L chart
         fig, ax = plt.subplots()
@@ -342,8 +353,9 @@ def optimize():
         pl_chart_url = base64.b64encode(img.getvalue()).decode()
 
         return render_template(
-            "backtest.html",
-            plot_url=None,
+            "optimization_results.html",
+            best_params=results['best_params'],
+            performance=results['performance'],
             total_return=optimization_results["total_return"],
             num_trades=optimization_results["num_trades"],
             win_rate=optimization_results["win_rate"],
@@ -352,7 +364,6 @@ def optimize():
         )
     else:
         return f"<h1>Error: {message}</h1>", 500
-
 
 @app.route("/plot/<string:plot_type>")
 def plot(plot_type):
