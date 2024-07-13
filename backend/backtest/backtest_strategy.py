@@ -1,47 +1,62 @@
 import pandas as pd
+import numpy as np  # Add this import
 
 class BacktestStrategy:
     def __init__(self, data, indicators):
         self.data = data
         self.indicators = indicators
 
-    def apply_indicators(self):
+    def backtest(self):
         for indicator in self.indicators:
             if indicator == 'SMA':
                 self.data['SMA'] = self.data['close'].rolling(window=20).mean()
             elif indicator == 'EMA':
                 self.data['EMA'] = self.data['close'].ewm(span=20, adjust=False).mean()
             elif indicator == 'RSI':
-                delta = self.data['close'].diff(1)
-                gain = delta.where(delta > 0, 0)
-                loss = -delta.where(delta < 0, 0)
-                avg_gain = gain.rolling(window=14).mean()
-                avg_loss = loss.rolling(window=14).mean()
-                rs = avg_gain / avg_loss
-                self.data['RSI'] = 100 - (100 / (1 + rs))
+                self.data['RSI'] = self.calculate_rsi()
             elif indicator == 'MACD':
-                self.data['EMA12'] = self.data['close'].ewm(span=12, adjust=False).mean()
-                self.data['EMA26'] = self.data['close'].ewm(span=26, adjust=False).mean()
-                self.data['MACD'] = self.data['EMA12'] - self.data['EMA26']
-                self.data['Signal'] = self.data['MACD'].ewm(span=9, adjust=False).mean()
+                self.data['MACD'], self.data['Signal'], self.data['Histogram'] = self.calculate_macd()
             elif indicator == 'BOLLINGER_BANDS':
-                self.data['Middle_Band'] = self.data['close'].rolling(window=20).mean()
-                self.data['Upper_Band'] = self.data['Middle_Band'] + 2 * self.data['close'].rolling(window=20).std()
-                self.data['Lower_Band'] = self.data['Middle_Band'] - 2 * self.data['close'].rolling(window=20).std()
+                self.data['Upper_Band'], self.data['Lower_Band'] = self.calculate_bollinger_bands()
             elif indicator == 'STOCHASTIC':
-                self.data['Lowest_Low'] = self.data['low'].rolling(window=14).min()
-                self.data['Highest_High'] = self.data['high'].rolling(window=14).max()
-                self.data['%K'] = 100 * (self.data['close'] - self.data['Lowest_Low']) / (self.data['Highest_High'] - self.data['Lowest_Low'])
-                self.data['%D'] = self.data['%K'].rolling(window=3).mean()
+                self.data['%K'], self.data['%D'] = self.calculate_stochastic()
 
-    def backtest(self):
-        self.apply_indicators()
-        # Backtesting logic (example with SMA crossover strategy)
         self.data['Position'] = 0
         self.data['Position'][20:] = np.where(self.data['SMA'][20:] > self.data['close'][20:], 1, -1)
-        self.data['Strategy_Return'] = self.data['Position'].shift(1) * self.data['close'].pct_change()
-        self.data['Cumulative_Return'] = (1 + self.data['Strategy_Return']).cumprod() - 1
-        total_return = self.data['Cumulative_Return'].iloc[-1]
-        num_trades = self.data['Position'].diff().fillna(0).abs().sum()
+        self.data['Return'] = self.data['close'].pct_change()
+        self.data['Strategy_Return'] = self.data['Return'] * self.data['Position'].shift()
+
+        total_return = self.data['Strategy_Return'].sum()
+        num_trades = self.data['Position'].abs().sum()
         win_rate = (self.data['Strategy_Return'] > 0).mean()
+
         return self.data, total_return, num_trades, win_rate
+
+    def calculate_rsi(self, period=14):
+        delta = self.data['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        return 100 - (100 / (1 + rs))
+
+    def calculate_macd(self, fast_period=12, slow_period=26, signal_period=9):
+        ema_fast = self.data['close'].ewm(span=fast_period, adjust=False).mean()
+        ema_slow = self.data['close'].ewm(span=slow_period, adjust=False).mean()
+        macd = ema_fast - ema_slow
+        signal = macd.ewm(span=signal_period, adjust=False).mean()
+        histogram = macd - signal
+        return macd, signal, histogram
+
+    def calculate_bollinger_bands(self, period=20, std_dev=2):
+        sma = self.data['close'].rolling(window=period).mean()
+        std = self.data['close'].rolling(window=period).std()
+        upper_band = sma + (std_dev * std)
+        lower_band = sma - (std_dev * std)
+        return upper_band, lower_band
+
+    def calculate_stochastic(self, k_period=14, d_period=3):
+        low_min = self.data['low'].rolling(window=k_period).min()
+        high_max = self.data['high'].rolling(window=k_period).max()
+        self.data['%K'] = 100 * (self.data['close'] - low_min) / (high_max - low_min)
+        self.data['%D'] = self.data['%K'].rolling(window=d_period).mean()
+        return self.data['%K'], self.data['%D']

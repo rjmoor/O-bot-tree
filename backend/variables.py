@@ -1,4 +1,4 @@
-STATE_MACHINE = 'True' 
+STATE_MACHINE = False 
 
 STATE_RED = 'red'        
 STATE_YELLOW = 'yellow'  
@@ -6,12 +6,12 @@ STATE_GREEN = 'green'
 current_state = STATE_RED
 
 SWITCHES = {
-    "RSI": 'False',
-    "MACD": 'False',
-    "SMA": 'False',
-    "EMA": 'False',
-    "BOLLINGER_BANDS": 'False',
-    "STOCHASTIC": 'False'
+    "RSI": True,
+    "MACD": True,
+    "SMA": False,
+    "EMA": False,
+    "BOLLINGER_BANDS": False,
+    "STOCHASTIC": False
 }
 
 BACKTESTING = {
@@ -31,13 +31,13 @@ OPTIMIZATION_RANGES = {
     },
     "SMA": {
         "SMA_PERIOD": [50, 100, 200],
-        "SMA_FAST": [10, 20, 30],
-        "SMA_SLOW": [50, 100, 200]
+        "Fast_Period": [10, 20, 30],
+        "Slow_Period": [50, 100, 200]
     },
     "EMA": {
         "EMA_PERIOD": [50, 100, 200],
-        "EMA_FAST": [10, 20, 30],
-        "EMA_SLOW": [50, 100, 200]
+        "Fast_Period": [10, 20, 30],
+        "Slow_Period": [50, 100, 200]
     },
     "BOLLINGER_BANDS": {
         "BOLLINGER_BANDS_PERIOD": [10, 20, 30],
@@ -81,14 +81,14 @@ LIVE_TRADING = {
         "SMA": {
             "enabled": SWITCHES["SMA"],
             "period": OPTIMIZATION_RANGES["SMA"]["SMA_PERIOD"],
-            "fast": OPTIMIZATION_RANGES["SMA"]["SMA_FAST"],
-            "slow": OPTIMIZATION_RANGES["SMA"]["SMA_SLOW"]
+            "fast": OPTIMIZATION_RANGES["SMA"]["Fast_Period"],
+            "slow": OPTIMIZATION_RANGES["SMA"]["Slow_Period"]
         },
         "EMA": {
             "enabled": SWITCHES["EMA"],
             "period": OPTIMIZATION_RANGES["EMA"]["EMA_PERIOD"],
-            "fast": OPTIMIZATION_RANGES["EMA"]["EMA_FAST"],
-            "slow": OPTIMIZATION_RANGES["EMA"]["EMA_SLOW"]
+            "fast": OPTIMIZATION_RANGES["EMA"]["Fast_Period"],
+            "slow": OPTIMIZATION_RANGES["EMA"]["Slow_Period"]
         },
         "BOLLINGER_BANDS": {
             "enabled": SWITCHES["BOLLINGER_BANDS"],
@@ -102,4 +102,3 @@ LIVE_TRADING = {
         }
     },
 }
-

@@ -28,3 +28,6 @@ backend/static/__init__.py
 backend/templates/__init__.py
 /backend/oanda_api/__pycache__
 /backend/strategies/__pycache__
+/backend/logss
+backend/app-full.py
+/backend/oanda_api/logs

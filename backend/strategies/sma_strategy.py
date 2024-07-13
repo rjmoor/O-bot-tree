@@ -1,28 +1,33 @@
 import pandas as pd
 
 class SMAStrategy:
-    def __init__(self, period=14):
-        self.period = period
+    def __init__(self, data, Fast_Period, Slow_Period):
+        self.data = data
+        self.Fast_Period = Fast_Period
+        self.Slow_Period = Slow_Period
 
-    def calculate_sma(self, data: pd.DataFrame) -> pd.DataFrame:
-        data['SMA'] = data['close'].rolling(window=self.period, min_periods=1).mean()
-        return data
+    def calculate_sma(self):
+        self.data['SMA_Fast'] = self.data['close'].rolling(window=self.Fast_Period).mean()
+        self.data['SMA_Slow'] = self.data['close'].rolling(window=self.Slow_Period).mean()
+        return self.data
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
-        data = self.calculate_sma(data)
-        data['Signal'] = 0
-        data['Signal'] = data['close'] > data['SMA']
-        data['Position'] = data['Signal'].shift(1)
-        return data
+    def generate_signal(self):
+        self.data = self.calculate_sma()
+        self.data['Signal'] = 0
+        self.data.loc[self.data['SMA_Fast'] > self.data['SMA_Slow'], 'Signal'] = 1
+        self.data.loc[self.data['SMA_Fast'] < self.data['SMA_Slow'], 'Signal'] = -1
+        return self.data
 
-    def backtest(self, data: pd.DataFrame) -> (pd.DataFrame, float, int, float):
-        data = self.generate_signals(data)
-        data['Strategy_Return'] = data['Position'] * data['close'].pct_change()
-        data['Cumulative_Return'] = (1 + data['Strategy_Return']).cumprod() - 1
-        total_return = data['Cumulative_Return'].iloc[-1]
-        num_trades = data['Position'].diff().fillna(0).abs().sum()
-        win_rate = (data['Strategy_Return'] > 0).mean()
-        return data, total_return, num_trades, win_rate
+    def backtest(self):
+        self.data = self.generate_signal()
+        self.data['Position'] = self.data['Signal'].shift()
+        self.data['Return'] = self.data['close'].pct_change()
+        self.data['Strategy_Return'] = self.data['Return'] * self.data['Position']
+        total_return = self.data['Strategy_Return'].sum()
+        num_trades = self.data['Position'].abs().sum()
+        win_rate = (self.data['Strategy_Return'] > 0).mean()
+
+        return self.data, total_return, num_trades, win_rate
 
     def optimize(self, data: pd.DataFrame, param_range: list) -> dict:
         best_params = None

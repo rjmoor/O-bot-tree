@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import os
-import defs  # Make sure your API keys and URLs are defined here
+import backend.defs as defs  # Make sure your API keys and URLs are defined here
 import logging
 import schedule
 import time

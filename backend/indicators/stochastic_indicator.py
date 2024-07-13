@@ -1,18 +1,17 @@
-# stochastic_indicator.py
-
 import pandas as pd
 
 class StochasticIndicator:
-    def __init__(self, k_window=14, d_window=3):
-        self.k_window = k_window
-        self.d_window = d_window
+    def __init__(self, data, k_period, d_period):
+        self.data = data
+        self.k_period = k_period
+        self.d_period = d_period
 
-    def calculate_stochastic(self, data: pd.DataFrame) -> pd.DataFrame:
-        data['Lowest_Low'] = data['low'].rolling(window=self.k_window).min()
-        data['Highest_High'] = data['high'].rolling(window=self.k_window).max()
-        data['%K'] = 100 * ((data['close'] - data['Lowest_Low']) / (data['Highest_High'] - data['Lowest_Low']))
-        data['%D'] = data['%K'].rolling(window=self.d_window).mean()
-        return data
+    def calculate_stochastic(self):
+        self.data['Lowest_Low'] = self.data['low'].rolling(window=self.k_period).min()
+        self.data['Highest_High'] = self.data['high'].rolling(window=self.k_period).max()
+        self.data['%K'] = 100 * ((self.data['close'] - self.data['Lowest_Low']) / (self.data['Highest_High'] - self.data['Lowest_Low']))
+        self.data['%D'] = self.data['%K'].rolling(window=self.d_period).mean()
+        return self.data
 
     def generate_signal(self, data: pd.DataFrame) -> pd.DataFrame:
         data = self.calculate_stochastic(data)

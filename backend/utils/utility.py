@@ -1,7 +1,7 @@
 # utility.py
 import pandas as pd
 from datetime import datetime, timedelta, timezone
-import defs
+import backend.defs as defs
 import variables
 
 def convert_to_dataframe(data):

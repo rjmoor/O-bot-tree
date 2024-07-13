@@ -5,32 +5,29 @@ import time
 from datetime import datetime, timedelta, timezone
 from threading import Thread
 
-import defs
 import matplotlib
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import pandas as pd
-import requests
-import variables
-from backtest.backtest_strategy import BacktestStrategy
-from flask import (Flask, jsonify, redirect, render_template, request, send_file, url_for)
+from flask import Flask, jsonify, redirect, render_template, request, send_file, url_for
 from flask_assets import Bundle, Environment
-from indicators.macd_indicator import MACDIndicator
-from indicators.stochastic_indicator import StochasticIndicator
-from oanda_api.oanda_api import OandaAPI
-from optimization.optimize_strategy import OptimizeStrategy
-from strategies.ema_crossover_strategy import EMACrossoverStrategy
-from strategies.ema_strategy import EMAStrategy
-from strategies.rsi_strategy import RSIStrategy
-from strategies.sma_crossover_strategy import SMACrossoverStrategy
-from strategies.sma_strategy import SMAStrategy
-from strategies.momentum_strategy import MomentumStrategy
+from backend.strategies.momentum_strategy import MomentumStrategy
+from backend.strategies.ema_crossover_strategy import EMACrossoverStrategy
+from backend.strategies.ema_strategy import EMAStrategy
+from backend.strategies.rsi_strategy import RSIStrategy
+from backend.strategies.sma_crossover_strategy import SMACrossoverStrategy
+from backend.strategies.sma_strategy import SMAStrategy
+from backend.oanda_api.oanda_api import OandaAPI
+from backend.optimization.optimize_strategy import OptimizeStrategy
+from backend.indicators.macd_indicator import MACDIndicator
+from backend.indicators.stochastic_indicator import StochasticIndicator
+import backend.variables as variables
 
 matplotlib.use("Agg")
 
 # Configure logging
 logging.basicConfig(
-    filename="./logs/OandaAPIData.log",
+    filename="./logs/Data.log",
     level=logging.INFO,
     format="%(asctime)s %(levelname)s:%(message)s",
 )
@@ -45,8 +42,6 @@ class TradeBot:
     def __init__(self):
         self.api = OandaAPI()
         self.running = False
-        self.macd_indicator = MACDIndicator()  # Initialize MACDIndicator
-        self.stochastic_indicator = StochasticIndicator()  # Initialize StochasticIndicator
 
     def start(self):
         self.running = True
@@ -58,53 +53,78 @@ class TradeBot:
         self.thread.join()
 
     def run(self):
+        if not variables.STATE_MACHINE:
+            logging.info("State machine is off. Exiting.")
+            return
+
         while self.running:
             for pair in variables.LIVE_TRADING["TRADE_INSTRUMENTS"]:
                 granularity = variables.LIVE_TRADING["TRADING_GRANULARITY"]
                 count = variables.LIVE_TRADING["TRADING_COUNT"]
                 data, message = self.api.get_historical_data(pair, granularity, count)
                 if data is not None:
-                    for indicator, params in variables.OPTIMIZATION_RANGES.items():
-                        param_range = params[next(iter(params))]
-                        optimization_results, _ =OptimizeStrategy(
-                            data, indicator, param_range
-                        )
-                        self.execute_trade(pair, optimization_results, data)
+                    for strategy_name, params in variables.OPTIMIZATION_RANGES.items():
+                        strategy_class = self.get_strategy_class(strategy_name)
+                        if strategy_class:
+                            param_sets = self.create_param_sets(params)
+                            
+                            for param_set in param_sets:
+                                optimizer = OptimizeStrategy(data, strategy_class, [param_set])
+                                optimization_results = optimizer.optimize()
+                                self.execute_trade(pair, optimization_results, data, param_set)
                 else:
-                    logging.error(
-                        f"Failed to get historical data for {pair}: {message}"
-                    )
+                    logging.error(f"Failed to get historical data for {pair}: {message}")
             time.sleep(3600)  # Run every hour
 
-    def execute_trade(self, pair, best_params, data):
-        # Apply momentum strategy
-        strategy = MomentumStrategy(data)
-        strategy.apply_rsi()
-        strategy.apply_stochastic()
-        strategy.generate_signals(indicator='RSI')
+    def execute_trade(self, pair, optimization_results, data, param_set):
+        rsi_params = {
+            'RSI_PERIOD': param_set.get('RSI_PERIOD', 14),
+            'RSI_OVERBOUGHT': param_set.get('RSI_OVERBOUGHT', 70),
+            'RSI_OVERSOLD': param_set.get('RSI_OVERSOLD', 30)
+        }
+        stochastic_params = {
+            'k_period': param_set.get('STOCHASTIC_K_PERIOD', 14),
+            'd_period': param_set.get('STOCHASTIC_D_PERIOD', 3)
+        }
 
-        # Check state based on momentum strategy
-        data, total_return, num_trades, win_rate = strategy.backtest()
+        strategy = MomentumStrategy(data, rsi_params, stochastic_params)
+        _, total_return, num_trades, win_rate = strategy.backtest()
 
-        macd_state = self.macd_indicator.check_green_light(data)
-        stochastic_state = self.stochastic_indicator.get_signal_state(data)
-        
-        if macd_state and stochastic_state == 'green':
-            # Example: Execute trade if both MACD and Stochastic are green
-            print(f"Green light for {pair}: Execute trade")
-        elif stochastic_state == 'yellow':
-            print(f"Yellow light for {pair}: Setup active, prepare to trade")
+        # Implement trading logic based on backtest results
+        if total_return > 0:
+            print(f"Positive return for {pair}: Execute trade")
         else:
-            print(f"Red light for {pair}: Not favorable to trade")
+            print(f"No positive return for {pair}: Do not trade")
+
+
+    def get_strategy_class(self, strategy_name):
+        strategy_classes = {
+            'RSI': RSIStrategy,
+            'SMA': SMAStrategy,
+            'EMA': EMAStrategy,
+            'SMACrossover': SMACrossoverStrategy,
+            'EMACrossover': EMACrossoverStrategy
+        }
+        return strategy_classes.get(strategy_name, None)
+
+    def create_param_sets(self, params):
+        if 'RSI_PERIOD' in params:
+            return [{'RSI_PERIOD': period, 'RSI_OVERBOUGHT': overbought, 'RSI_OVERSOLD': oversold}
+                    for period in params['RSI_PERIOD']
+                    for overbought in params['RSI_OVERBOUGHT']
+                    for oversold in params['RSI_OVERSOLD']]
+        elif 'Fast_Period' in params and 'Slow_Period' in params:
+            return [{'Fast_Period': fast, 'Slow_Period': slow}
+                    for fast in params['Fast_Period']
+                    for slow in params['Slow_Period']]
+        elif 'STOCHASTIC_K_PERIOD' in params:
+            return [{'STOCHASTIC_K_PERIOD': k_period, 'STOCHASTIC_D_PERIOD': d_period}
+                    for k_period in params['STOCHASTIC_K_PERIOD']
+                    for d_period in params['STOCHASTIC_D_PERIOD']]
+        else:
+            return [{}]  # Default empty parameter set for strategies without additional params
 
 trade_bot = TradeBot()
-
-
-
-
-def get_tradingview_symbol(oanda_symbol):
-    return oanda_symbol.replace("_", "")
-
 
 @app.route("/")
 def index():
@@ -114,7 +134,6 @@ def index():
         return render_template("index.html", account_info=account_info)
     else:
         return f"<h1>Error: {message}</h1>", 500
-
 
 @app.route("/auto_trades")
 def auto_trades():
@@ -175,7 +194,6 @@ def auto_trades():
             error=message,
         )
 
-
 @app.route("/manual_trades", methods=["GET", "POST"])
 def manual_trades():
     oanda_api = OandaAPI()
@@ -225,7 +243,6 @@ def manual_trades():
             tradingview_symbol=tradingview_symbol,
         )
 
-
 @app.route("/close_trade/<trade_id>", methods=["POST"])
 def close_trade(trade_id):
     oanda_api = OandaAPI()
@@ -235,7 +252,6 @@ def close_trade(trade_id):
     else:
         return f"<h1>Error: {message}</h1>", 500
 
-
 @app.route("/positions")
 def positions():
     oanda_api = OandaAPI()
@@ -244,7 +260,6 @@ def positions():
         return render_template("positions.html", positions=positions)
     else:
         return f"<h1>Error: {message}</h1>", 500
-
 
 @app.route("/backtest", methods=["GET", "POST"])
 def backtest():
@@ -335,7 +350,6 @@ def backtest():
     else:
         return f"<h1>Error: {message}</h1>", 500
 
-
 @app.route("/optimize", methods=["POST"])
 def optimize():
     strategy_name = request.form["strategy"]
@@ -346,19 +360,19 @@ def optimize():
 
     if data is not None:
         if strategy_name == 'SMA':
-            results =OptimizeStrategy(data, SMAStrategy, {'single': list(map(int, param_range))})
+            results = optimize_strategy(data, SMAStrategy, {'single': list(map(int, param_range))})
         elif strategy_name == 'EMA':
-            results =OptimizeStrategy(data, EMAStrategy, {'single': list(map(int, param_range))})
+            results = optimize_strategy(data, EMAStrategy, {'single': list(map(int, param_range))})
         elif strategy_name == 'RSI':
-            results =OptimizeStrategy(data, RSIStrategy, {'single': list(map(int, param_range))})
+            results = optimize_strategy(data, RSIStrategy, {'single': list(map(int, param_range))})
         elif strategy_name == 'SMACrossover':
             fast_range = list(map(int, param_range[0].split("-")))
             slow_range = list(map(int, param_range[1].split("-")))
-            results =OptimizeStrategy(data, SMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
+            results = optimize_strategy(data, SMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
         elif strategy_name == 'EMACrossover':
             fast_range = list(map(int, param_range[0].split("-")))
             slow_range = list(map(int, param_range[1].split("-")))
-            results =OptimizeStrategy(data, EMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
+            results = optimize_strategy(data, EMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
 
         return render_template(
             "optimization_results.html",

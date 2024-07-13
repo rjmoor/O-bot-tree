@@ -1,43 +1,34 @@
 import pandas as pd
 
 class RSIStrategy:
-    def __init__(self, period=14, overbought=70, oversold=30):
-        self.period = period
-        self.overbought = overbought
-        self.oversold = oversold
+    def __init__(self, data, RSI_PERIOD, RSI_OVERBOUGHT, RSI_OVERSOLD):
+        self.data = data
+        self.RSI_PERIOD = int(RSI_PERIOD)
+        self.RSI_OVERBOUGHT = int(RSI_OVERBOUGHT)
+        self.RSI_OVERSOLD = int(RSI_OVERSOLD)
 
-    def calculate_rsi(self, data: pd.DataFrame) -> pd.DataFrame:
-        delta = data['close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=self.period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=self.period).mean()
+    def calculate_rsi(self):
+        delta = self.data['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=self.RSI_PERIOD).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=self.RSI_PERIOD).mean()
         rs = gain / loss
-        data['RSI'] = 100 - (100 / (1 + rs))
-        return data
+        self.data['RSI'] = 100 - (100 / (1 + rs))
+        return self.data
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
-        data = self.calculate_rsi(data)
-        data['Signal'] = 0
-        data['Signal'][data['RSI'] > self.overbought] = -1
-        data['Signal'][data['RSI'] < self.oversold] = 1
-        data['Position'] = data['Signal'].shift(1)
-        return data
+    def generate_signal(self):
+        self.data = self.calculate_rsi()
+        self.data['Signal'] = 0
+        self.data['Signal'][self.data['RSI'] > self.RSI_OVERBOUGHT] = -1
+        self.data['Signal'][self.data['RSI'] < self.RSI_OVERSOLD] = 1
+        self.data['Position'] = self.data['Signal'].shift()
+        return self.data
 
-    def backtest(self, data: pd.DataFrame) -> (pd.DataFrame, float, int, float):
-        data = self.generate_signals(data)
-        data['Strategy_Return'] = data['Position'] * data['close'].pct_change()
-        data['Cumulative_Return'] = (1 + data['Strategy_Return']).cumprod() - 1
-        total_return = data['Cumulative_Return'].iloc[-1]
-        num_trades = data['Position'].diff().fillna(0).abs().sum()
-        win_rate = (data['Strategy_Return'] > 0).mean()
-        return data, total_return, num_trades, win_rate
-
-    def optimize(self, data: pd.DataFrame, param_range: list) -> dict:
-        best_params = None
-        best_performance = -float('inf')
-        for param in param_range:
-            self.period = param
-            _, total_return, _, _ = self.backtest(data)
-            if total_return > best_performance:
-                best_performance = total_return
-                best_params = {'period': param}
-        return {'best_params': best_params, 'performance': best_performance}
+    def backtest(self):
+        self.data = self.generate_signal()
+        self.data['Strategy'] = self.data['Position'].shift() * self.data['close'].pct_change()
+        self.data['Strategy'] = self.data['Strategy'].fillna(0)
+        self.data['Cumulative_Return'] = (1 + self.data['Strategy']).cumprod() - 1
+        total_return = self.data['Cumulative_Return'].iloc[-1]
+        num_trades = self.data['Position'].diff().fillna(0).abs().sum() / 2
+        win_rate = len(self.data[self.data['Strategy'] > 0]) / num_trades if num_trades != 0 else 0
+        return self.data, total_return, num_trades, win_rate

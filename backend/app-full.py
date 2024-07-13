@@ -11,7 +11,7 @@ import requests
 from dateutil.parser import parse
 from flask import Flask, jsonify, render_template, request, send_file
 
-import defs
+import backend.defs as defs
 
 matplotlib.use('Agg')
 

@@ -1,22 +1,20 @@
-# macd_indicator.py
-
 import pandas as pd
 
 class MACDIndicator:
-    def __init__(self, short_window=12, long_window=26, signal_window=9):
-        self.short_window = short_window
-        self.long_window = long_window
-        self.signal_window = signal_window
+    def __init__(self, fast_period=12, slow_period=26, signal_period=9):
+        self.fast_period = fast_period
+        self.slow_period = slow_period
+        self.signal_period = signal_period
 
     def calculate_macd(self, data: pd.DataFrame) -> pd.DataFrame:
         # Calculate the short-term EMA
-        data['EMA_short'] = data['close'].ewm(span=self.short_window, adjust=False).mean()
+        data['EMA_short'] = data['close'].ewm(span=self.fast_period, adjust=False).mean()
         # Calculate the long-term EMA
-        data['EMA_long'] = data['close'].ewm(span=self.long_window, adjust=False).mean()
+        data['EMA_long'] = data['close'].ewm(span=self.slow_period, adjust=False).mean()
         # Calculate the MACD line
         data['MACD'] = data['EMA_short'] - data['EMA_long']
         # Calculate the Signal line
-        data['Signal'] = data['MACD'].ewm(span=self.signal_window, adjust=False).mean()
+        data['Signal'] = data['MACD'].ewm(span=self.signal_period, adjust=False).mean()
         # Calculate the Histogram
         data['Histogram'] = data['MACD'] - data['Signal']
         return data
