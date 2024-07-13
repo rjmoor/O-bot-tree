@@ -21,3 +21,10 @@ backend/indicators/__init__.py
 backend/optimization/__init__.py
 backend/strategies/__init__.py
 /backend/utils/__pycache__
+/backend/backtest/__pycache__
+/backend/optimization/__pycache__
+backend/oanda_api/__init__.py
+backend/static/__init__.py
+backend/templates/__init__.py
+/backend/oanda_api/__pycache__
+/backend/strategies/__pycache__

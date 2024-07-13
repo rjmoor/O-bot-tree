@@ -5,7 +5,6 @@ import time
 from datetime import datetime, timedelta, timezone
 from threading import Thread
 
-from backend.backtest.backtest_strategy import backtest_strategy
 import defs
 import matplotlib
 import matplotlib.pyplot as plt
@@ -13,15 +12,19 @@ import mplfinance as mpf
 import pandas as pd
 import requests
 import variables
-from backtest import optimize_strategy
-from dateutil.parser import parse
+from backtest.backtest_strategy import BacktestStrategy
 from flask import (Flask, jsonify, redirect, render_template, request, send_file, url_for)
 from flask_assets import Bundle, Environment
-from utils.indicators.strategies import SMAStrategy, EMAStrategy, RSIStrategy, SMACrossoverStrategy, EMACrossoverStrategy
-from macd_indicator import MACDIndicator
-from stochastic_indicator import StochasticIndicator  # Import StochasticIndicator
-from optimization import optimize_strategy
-from backend.oanda_api.oanda_api import OandaAPI
+from indicators.macd_indicator import MACDIndicator
+from indicators.stochastic_indicator import StochasticIndicator
+from oanda_api.oanda_api import OandaAPI
+from optimization.optimize_strategy import OptimizeStrategy
+from strategies.ema_crossover_strategy import EMACrossoverStrategy
+from strategies.ema_strategy import EMAStrategy
+from strategies.rsi_strategy import RSIStrategy
+from strategies.sma_crossover_strategy import SMACrossoverStrategy
+from strategies.sma_strategy import SMAStrategy
+from strategies.momentum_strategy import MomentumStrategy
 
 matplotlib.use("Agg")
 
@@ -63,7 +66,7 @@ class TradeBot:
                 if data is not None:
                     for indicator, params in variables.OPTIMIZATION_RANGES.items():
                         param_range = params[next(iter(params))]
-                        optimization_results, _ = optimize_strategy(
+                        optimization_results, _ =OptimizeStrategy(
                             data, indicator, param_range
                         )
                         self.execute_trade(pair, optimization_results, data)
@@ -73,8 +76,16 @@ class TradeBot:
                     )
             time.sleep(3600)  # Run every hour
 
-    def execute_trade(self, pair, optimization_results, data):
-        # Implement trading logic here using the best parameters from optimization_results
+    def execute_trade(self, pair, best_params, data):
+        # Apply momentum strategy
+        strategy = MomentumStrategy(data)
+        strategy.apply_rsi()
+        strategy.apply_stochastic()
+        strategy.generate_signals(indicator='RSI')
+
+        # Check state based on momentum strategy
+        data, total_return, num_trades, win_rate = strategy.backtest()
+
         macd_state = self.macd_indicator.check_green_light(data)
         stochastic_state = self.stochastic_indicator.get_signal_state(data)
         
@@ -87,6 +98,8 @@ class TradeBot:
             print(f"Red light for {pair}: Not favorable to trade")
 
 trade_bot = TradeBot()
+
+
 
 
 def get_tradingview_symbol(oanda_symbol):
@@ -333,19 +346,19 @@ def optimize():
 
     if data is not None:
         if strategy_name == 'SMA':
-            results = optimize_strategy(data, SMAStrategy, {'single': list(map(int, param_range))})
+            results =OptimizeStrategy(data, SMAStrategy, {'single': list(map(int, param_range))})
         elif strategy_name == 'EMA':
-            results = optimize_strategy(data, EMAStrategy, {'single': list(map(int, param_range))})
+            results =OptimizeStrategy(data, EMAStrategy, {'single': list(map(int, param_range))})
         elif strategy_name == 'RSI':
-            results = optimize_strategy(data, RSIStrategy, {'single': list(map(int, param_range))})
+            results =OptimizeStrategy(data, RSIStrategy, {'single': list(map(int, param_range))})
         elif strategy_name == 'SMACrossover':
             fast_range = list(map(int, param_range[0].split("-")))
             slow_range = list(map(int, param_range[1].split("-")))
-            results = optimize_strategy(data, SMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
+            results =OptimizeStrategy(data, SMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
         elif strategy_name == 'EMACrossover':
             fast_range = list(map(int, param_range[0].split("-")))
             slow_range = list(map(int, param_range[1].split("-")))
-            results = optimize_strategy(data, EMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
+            results =OptimizeStrategy(data, EMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
 
         return render_template(
             "optimization_results.html",
