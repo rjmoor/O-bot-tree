@@ -18,9 +18,10 @@ from backend.strategies.rsi_strategy import RSIStrategy
 from backend.strategies.sma_crossover_strategy import SMACrossoverStrategy
 from backend.strategies.sma_strategy import SMAStrategy
 from backend.oanda_api.oanda_api import OandaAPI
-from backend.optimization.optimize_strategy import OptimizeStrategy
+from backend.optimization.optimize_strategy_1 import OptimizeStrategy
 from backend.indicators.macd_indicator import MACDIndicator
 from backend.indicators.stochastic_indicator import StochasticIndicator
+from backend.backtest.backtest_strategy import BacktestStrategy
 import backend.variables as variables
 
 matplotlib.use("Agg")
@@ -276,10 +277,11 @@ def backtest():
 
     oanda_api = OandaAPI()
     data, message = oanda_api.get_historical_data(pair, granularity, count)
+    
     if data is not None:
-        backtest_data, total_return, num_trades, win_rate = backtest_strategy(
-            data, indicators
-        )
+        strategy = BacktestStrategy(data, indicators)  # Instantiate the class
+        backtest_data, total_return, num_trades, win_rate = strategy.backtest()  # Call the method
+
 
         fig, ax = plt.subplots()
         ax.plot(backtest_data.index, backtest_data["close"], label="Close Price")
@@ -333,7 +335,7 @@ def backtest():
         ax.set_ylabel("Price")
         ax.legend()
 
-        img = io.Bytes.IO()
+        img = io.BytesIO()
         plt.savefig(img, format="png")
         img.seek(0)
         plt.close(fig)
@@ -352,35 +354,50 @@ def backtest():
 
 @app.route("/optimize", methods=["POST"])
 def optimize():
-    strategy_name = request.form["strategy"]
-    param_range = request.form["range"].split(",")
+    try:
+        strategy_names = request.form.getlist("strategies")
+        param_ranges = request.form["range"].split(",")
 
-    oanda_api = OandaAPI()
-    data, message = oanda_api.get_historical_data("EUR_USD", "D", 500)
+        oanda_api = OandaAPI()
+        data, message = oanda_api.get_historical_data("EUR_USD", "D", 500)
+        if data is None:
+            return f"<h1>Error: {message}</h1>", 500
 
-    if data is not None:
-        if strategy_name == 'SMA':
-            results = optimize_strategy(data, SMAStrategy, {'single': list(map(int, param_range))})
-        elif strategy_name == 'EMA':
-            results = optimize_strategy(data, EMAStrategy, {'single': list(map(int, param_range))})
-        elif strategy_name == 'RSI':
-            results = optimize_strategy(data, RSIStrategy, {'single': list(map(int, param_range))})
-        elif strategy_name == 'SMACrossover':
-            fast_range = list(map(int, param_range[0].split("-")))
-            slow_range = list(map(int, param_range[1].split("-")))
-            results = optimize_strategy(data, SMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
-        elif strategy_name == 'EMACrossover':
-            fast_range = list(map(int, param_range[0].split("-")))
-            slow_range = list(map(int, param_range[1].split("-")))
-            results = optimize_strategy(data, EMACrossoverStrategy, {'fast': fast_range, 'slow': slow_range})
+        strategy_classes = [get_strategy_class(name) for name in strategy_names if get_strategy_class(name)]
+        param_dict = {name: variables.OPTIMIZATION_RANGES[name] for name in strategy_names}
+
+        optimizer = OptimizeStrategy(data, strategy_classes, param_dict)
+        best_combinations = optimizer.optimize()
+
+        # Generate report
+        report = generate_report(best_combinations)
 
         return render_template(
             "optimization_results.html",
-            best_params=results['best_params'],
-            performance=results['performance']
+            report=report
         )
-    else:
-        return f"<h1>Error: {message}</h1>", 500
+
+    except KeyError as e:
+        logging.error(f"Missing form data: {e}")
+        return f"<h1>Error: Missing form data - {e}</h1>", 400
+    except Exception as e:
+        logging.error(f"Unhandled exception: {e}")
+        return f"<h1>Error: {e}</h1>", 500
+
+def generate_report(best_combinations):
+    report = []
+    for i, (params, performance, total_return, num_trades, win_rate, results) in enumerate(best_combinations):
+        grade = 'A' if i == 0 else 'B' if i == 1 else 'C' if i == 2 else 'D'
+        report.append({
+            'params': params,
+            'performance': performance,
+            'total_return': total_return,
+            'num_trades': num_trades,
+            'win_rate': win_rate,
+            'grade': grade
+        })
+    return report
+
 
 @app.route("/plot/<string:plot_type>")
 def plot(plot_type):
@@ -397,7 +414,7 @@ def plot(plot_type):
         ax.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=90)
         ax.axis("equal")
 
-        img = io.Bytes.IO()
+        img = io.BytesIO()
         plt.savefig(img, format="png")
         img.seek(0)
         plt.close(fig)

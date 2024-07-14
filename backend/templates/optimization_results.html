@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Optimization Results</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>Optimization Results</h1>
+    <div id="plots"></div>
+    <script>
+        const reports = {{ report | tojson }};
+        const plotsDiv = document.getElementById('plots');
+        reports.forEach((report, index) => {
+            const trace = {
+                x: report.results.date,
+                y: report.results.close,
+                type: 'scatter',
+                mode: 'lines',
+                name: `Strategy ${index + 1} - ${report.grade}`
+            };
+            const layout = {
+                title: `Strategy ${index + 1} - ${report.grade}`,
+                xaxis: {title: 'Date'},
+                yaxis: {title: 'Price'}
+            };
+            const plotDiv = document.createElement('div');
+            plotDiv.id = `plot${index + 1}`;
+            plotDiv.style.width = '100%';
+            plotDiv.style.height = '400px';
+            plotsDiv.appendChild(plotDiv);
+            Plotly.newPlot(plotDiv.id, [trace], layout);
+        });
+    </script>
+</body>
+</html>
