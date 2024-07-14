@@ -1,35 +1,115 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Optimization Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        #chart-container {
+            width: 100%;
+            height: 600px;
+            overflow: hidden;
+        }
+        .chart {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
 </head>
 <body>
-    <h1>Optimization Results</h1>
-    <div id="plots"></div>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Navigation</h2>
+            <ul>
+                <li><a href="{{ url_for('index') }}">Overview</a></li>
+                <li><a href="#">Account Settings</a></li>
+                <li><a href="{{ url_for('manual_trades') }}">Manual Trades</a></li>
+                <li><a href="{{ url_for('auto_trades') }}">View Auto Trades</a></li>
+                <li><a href="{{ url_for('positions') }}">Open Positions</a></li>
+                <li><a href="{{ url_for('backtest') }}">Backtest</a></li>
+                <li><a href="{{ url_for('settings') }}">Setup Backtest</a></li>
+            </ul>
+        </div>
+        <div class="content">
+            <h1>Optimization Results</h1>
+            <div id="plots"></div>
+            <script>
+                const reports = {{ report | tojson }};
+                const plotsDiv = document.getElementById('plots');
+                reports.forEach((report, index) => {
+                    const trace = {
+                        x: report.results.date,
+                        y: report.results.close,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: `Strategy ${index + 1} - ${report.grade}`
+                    };
+                    const layout = {
+                        title: `Strategy ${index + 1} - ${report.grade}`,
+                        xaxis: { title: 'Date' },
+                        yaxis: { title: 'Price' },
+                        height: 600,
+                        width: 1000,
+                        autosize: true,
+                        showlegend: true,
+                        legend: {
+                            orientation: 'h',
+                            yanchor: 'bottom',
+                            y: 1,
+                            xanchor: 'right',
+                            x: 1
+                        }
+                    };
+                    const plotDiv = document.createElement('div');
+                    plotDiv.id = `plot${index + 1}`;
+                    plotDiv.className = 'chart';
+                    plotsDiv.appendChild(plotDiv);
+                    Plotly.newPlot(plotDiv.id, [trace], layout);
+                });
+            </script>
+            <div>
+                <h2>Optimization Report</h2>
+                <table>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Grade</th>
+                        <th>Total Return</th>
+                        <th>Number of Trades</th>
+                        <th>Win Rate</th>
+                    </tr>
+                    {% for item in report %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ item.grade }}</td>
+                        <td>{{ item.total_return * 100 }}%</td>
+                        <td>{{ item.num_trades }}</td>
+                        <td>{{ item.win_rate * 100 }}%</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                <button onclick="exportToExcel()">Export to Excel</button>
+            </div>
+        </div>
+    </div>
     <script>
-        const reports = {{ report | tojson }};
-        const plotsDiv = document.getElementById('plots');
-        reports.forEach((report, index) => {
-            const trace = {
-                x: report.results.date,
-                y: report.results.close,
-                type: 'scatter',
-                mode: 'lines',
-                name: `Strategy ${index + 1} - ${report.grade}`
-            };
-            const layout = {
-                title: `Strategy ${index + 1} - ${report.grade}`,
-                xaxis: {title: 'Date'},
-                yaxis: {title: 'Price'}
-            };
-            const plotDiv = document.createElement('div');
-            plotDiv.id = `plot${index + 1}`;
-            plotDiv.style.width = '100%';
-            plotDiv.style.height = '400px';
-            plotsDiv.appendChild(plotDiv);
-            Plotly.newPlot(plotDiv.id, [trace], layout);
-        });
+        function exportToExcel() {
+            const data = {{ report | tojson }};
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Strategy,Grade,Total Return,Number of Trades,Win Rate\n";
+            data.forEach((item, index) => {
+                const row = `${index + 1},${item.grade},${item.total_return * 100}%,${item.num_trades},${item.win_rate * 100}%\n`;
+                csvContent += row;
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "optimization_results.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     </script>
 </body>
 </html>

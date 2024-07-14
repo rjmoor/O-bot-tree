@@ -9,7 +9,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import pandas as pd
-from flask import Flask, jsonify, redirect, render_template, request, send_file, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_file, url_for, session
 from flask_assets import Bundle, Environment
 from backend.strategies.momentum_strategy import MomentumStrategy
 from backend.strategies.ema_crossover_strategy import EMACrossoverStrategy
@@ -18,7 +18,7 @@ from backend.strategies.rsi_strategy import RSIStrategy
 from backend.strategies.sma_crossover_strategy import SMACrossoverStrategy
 from backend.strategies.sma_strategy import SMAStrategy
 from backend.oanda_api.oanda_api import OandaAPI
-from backend.optimization.optimize_strategy_1 import OptimizeStrategy
+from backend.optimization.optimize_strategy import OptimizeStrategy
 from backend.indicators.macd_indicator import MACDIndicator
 from backend.indicators.stochastic_indicator import StochasticIndicator
 from backend.backtest.backtest_strategy import BacktestStrategy
@@ -34,6 +34,7 @@ logging.basicConfig(
 )
 
 app = Flask(__name__)
+app.secret_key = 'Rahm'
 
 assets = Environment(app)
 scss = Bundle('static/styles/main.scss', filters='pyscss', output='static/styles/main.css')
@@ -168,7 +169,7 @@ def auto_trades():
     # Get historical data and generate candlestick chart
     data, message = oanda_api.get_historical_data(selected_instrument, "H1", 100)
     if data is not None:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(14, 10))  # Adjust the figure size for larger plot
         mpf.plot(data, type="candle", style="charles", ax=ax)
         img = io.BytesIO()
         plt.savefig(img, format="png")
@@ -282,8 +283,7 @@ def backtest():
         strategy = BacktestStrategy(data, indicators)  # Instantiate the class
         backtest_data, total_return, num_trades, win_rate = strategy.backtest()  # Call the method
 
-
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(14, 10))  # Adjust the figure size for larger plot
         ax.plot(backtest_data.index, backtest_data["close"], label="Close Price")
         if "SMA" in indicators:
             ax.plot(backtest_data.index, backtest_data["SMA"], label="SMA")
@@ -348,11 +348,15 @@ def backtest():
             total_return=total_return,
             num_trades=num_trades,
             win_rate=win_rate,
+            pair=pair,
+            granularity=granularity,
+            count=count,
+            indicators=indicators
         )
     else:
         return f"<h1>Error: {message}</h1>", 500
 
-@app.route("/optimize", methods=["POST"])
+@app.route("/optimize", methods=["GET", "POST"])
 def optimize():
     try:
         strategy_names = request.form.getlist("strategies")
@@ -369,6 +373,8 @@ def optimize():
         optimizer = OptimizeStrategy(data, strategy_classes, param_dict)
         best_combinations = optimizer.optimize()
 
+        session['best_combinations'] = best_combinations  # Save to session
+
         # Generate report
         report = generate_report(best_combinations)
 
@@ -384,6 +390,36 @@ def optimize():
         logging.error(f"Unhandled exception: {e}")
         return f"<h1>Error: {e}</h1>", 500
 
+@app.route("/download_report")
+def download_report():
+    best_combinations = session.get('best_combinations', [])
+    if not best_combinations:
+        return f"<h1>No report available</h1>", 400
+
+    output = io.BytesIO()
+    writer = pd.ExcelWriter(output, engine='xlsxwriter')
+
+    for i, (params, performance, total_return, num_trades, win_rate, results) in enumerate(best_combinations):
+        df = pd.DataFrame(results)
+        sheet_name = f"Strategy_{i+1}_Grade_{chr(65+i)}"
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
+        worksheet = writer.sheets[sheet_name]
+        worksheet.write('K1', 'Params')
+        worksheet.write('K2', str(params))
+        worksheet.write('L1', 'Performance')
+        worksheet.write('L2', performance)
+        worksheet.write('M1', 'Total Return')
+        worksheet.write('M2', total_return)
+        worksheet.write('N1', 'Number of Trades')
+        worksheet.write('N2', num_trades)
+        worksheet.write('O1', 'Win Rate')
+        worksheet.write('O2', win_rate)
+
+    writer.save()
+    output.seek(0)
+
+    return send_file(output, attachment_filename='optimization_report.xlsx', as_attachment=True)
+
 def generate_report(best_combinations):
     report = []
     for i, (params, performance, total_return, num_trades, win_rate, results) in enumerate(best_combinations):
@@ -397,7 +433,6 @@ def generate_report(best_combinations):
             'grade': grade
         })
     return report
-
 
 @app.route("/plot/<string:plot_type>")
 def plot(plot_type):
