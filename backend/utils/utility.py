@@ -1,8 +1,8 @@
-# utility.py
 import pandas as pd
-from datetime import datetime, timedelta, timezone
+import logging
+from datetime import datetime
 import backend.defs as defs
-import variables
+import backend.variables as variables
 
 def convert_to_dataframe(data):
     df = pd.DataFrame(data)
@@ -20,3 +20,14 @@ def transition_state(new_state):
     global current_state
     if new_state in [variables.STATE_RED, variables.STATE_YELLOW, variables.STATE_GREEN]:
         current_state = new_state
+
+def configure_logging():
+    log_directory = '../logs'
+    log_filename = f"{log_directory}/Data_{datetime.now().strftime('%Y-%m-%d')}.log"
+    logging.basicConfig(
+        filename=log_filename,
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s:%(message)s",
+    )
+    logging.getLogger().addHandler(logging.StreamHandler())  # Optional: To also log to console
+    logging.info("Logging configured successfully.")

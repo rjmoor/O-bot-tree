@@ -31,3 +31,8 @@ backend/templates/__init__.py
 /backend/logss
 backend/app-full.py
 /backend/oanda_api/logs
+backend/database/sqlite/forex_data.db
+backend/database/sqlite/defs.py
+backend/database/influxdb.py
+backend/database/sqlite/__pycache__/defs.cpython-312.pyc
+/backend/database/sqlite/logs

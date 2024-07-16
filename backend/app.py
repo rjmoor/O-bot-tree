@@ -23,17 +23,15 @@ from backend.indicators.macd_indicator import MACDIndicator
 from backend.indicators.stochastic_indicator import StochasticIndicator
 from backend.backtest.backtest_strategy import BacktestStrategy
 import backend.variables as variables
+from backend.utils.utility import configure_logging  # Import the configure_logging function
 
 matplotlib.use("Agg")
 
 # Configure logging
-logging.basicConfig(
-    filename="./logs/Data.log",
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s:%(message)s",
-)
+configure_logging()
 
 app = Flask(__name__)
+
 app.secret_key = 'Rahm'
 
 assets = Environment(app)
