@@ -6,17 +6,6 @@
     <title>Backtest and Optimization Results</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-        #chart-container {
-            width: 100%;
-            height: 600px;
-            overflow: hidden;
-        }
-        #chart {
-            width: 100%;
-            height: 100%;
-        }
-    </style>
 </head>
 <body>
     <div class="container">
@@ -106,20 +95,6 @@
                 <p><strong>Number of Trades:</strong> {{ num_trades }}</p>
                 <p><strong>Win Rate:</strong> {{ win_rate * 100 }}%</p>
             </div>
-            <div>
-                <h2>Backtest Parameters</h2>
-                <p>Pair: {{ pair }}</p>
-                <p>Granularity: {{ granularity }}</p>
-                <p>Count: {{ count }}</p>
-                <p>Indicators: {{ indicators }}</p>
-            </div>
-            <button onclick="toggleChart()">Toggle Chart Size</button>
-            <script>
-                function toggleChart() {
-                    const chartContainer = document.getElementById('chart-container');
-                    chartContainer.style.height = chartContainer.style.height === '600px' ? '1000px' : '600px';
-                }
-            </script>
             {% endif %}
             <h1>Optimization</h1>
             <div class="optimize-form">

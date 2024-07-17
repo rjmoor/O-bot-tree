@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Account Status</title>
+    <title>Trading Bot Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
 </head>
 <body>
@@ -12,28 +12,74 @@
             <h2>Navigation</h2>
             <ul>
                 <li><a href="{{ url_for('index') }}">Overview</a></li>
-                <li><a href="#">Account Settings</a></li>
                 <li><a href="{{ url_for('manual_trades') }}">Manual Trades</a></li>
-                <li><a href="{{ url_for('auto_trades') }}">View Auto Trades</a></li>
+                <li><a href="{{ url_for('auto_trades') }}">Auto Trades</a></li>
                 <li><a href="{{ url_for('positions') }}">Open Positions</a></li>
                 <li><a href="{{ url_for('backtest') }}">Backtest</a></li>
-                <li><a href="{{ url_for('settings') }}">Setup Backtest</a></li>
+                <li><a href="{{ url_for('settings') }}">Settings</a></li>
             </ul>
         </div>
         <div class="content">
-            <h1>Account Status</h1>
-            <p><strong>Account ID:</strong> {{ account_info['account_id'] }}</p>
-            <p><strong>Balance:</strong> {{ account_info['balance'] }}</p>
-            <p><strong>Margin Used:</strong> {{ account_info['margin_used'] }}</p>
-            <p><strong>Margin Available:</strong> {{ account_info['margin_available'] }}</p>
-            <p><strong>Open Trades:</strong> {{ account_info['open_trades'] }}</p>
-            <p><strong>Open Positions:</strong> {{ account_info['open_positions'] }}</p>
-            <p><strong>Unrealized P/L:</strong> {{ account_info['unrealized_pl'] }}</p>
-            <p><strong>Open Exchanges:</strong> {{ account_info['open_exchanges'] }}</p>
-            <div class="plot">
-                <img src="{{ url_for('plot', plot_type='balance') }}" alt="Balance Plot">
+            <h1>Trading Bot Dashboard</h1>
+            <div class="content">
+                <h1>Account Status</h1>
+                <p><strong>Account ID:</strong> {{ account_info['account_id'] }}</p>
+                <p><strong>Balance:</strong> {{ account_info['balance'] }}</p>
+                <p><strong>Margin Used:</strong> {{ account_info['margin_used'] }}</p>
+                <p><strong>Margin Available:</strong> {{ account_info['margin_available'] }}</p>
+                <p><strong>Open Trades:</strong> {{ account_info['open_trades'] }}</p>
+                <p><strong>Open Positions:</strong> {{ account_info['open_positions'] }}</p>
+                <p><strong>Unrealized P/L:</strong> {{ account_info['unrealized_pl'] }}</p>
+                <p><strong>Open Exchanges:</strong> {{ account_info['open_exchanges'] }}</p>
+                <div class="plot">
+                    <img src="{{ url_for('plot', plot_type='balance') }}" alt="Balance Plot">
+                </div>
+            </div>
+            <div class="controls">
+                <button onclick="startBot()">Start Bot</button>
+                <button onclick="stopBot()">Stop Bot</button>
+            </div>
+            <div class="logs">
+                <h2>Logs</h2>
+                <label for="logOutput">Log Output:</label>
+                <textarea id="logOutput" rows="20" cols="100"></textarea>
             </div>
         </div>
     </div>
+    <script>
+        function startBot() {
+            fetch('/start_bot')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Bot started successfully');
+                    } else {
+                        alert('Failed to start bot');
+                    }
+                });
+        }
+
+        function stopBot() {
+            fetch('/stop_bot')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Bot stopped successfully');
+                    } else {
+                        alert('Failed to stop bot');
+                    }
+                });
+        }
+
+        function fetchLogs() {
+            fetch('/logs')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('logOutput').value = data.logs;
+                });
+        }
+
+        setInterval(fetchLogs, 5000); // Fetch logs every 5 seconds
+    </script>
 </body>
 </html>

@@ -36,3 +36,11 @@ backend/database/sqlite/defs.py
 backend/database/influxdb.py
 backend/database/sqlite/__pycache__/defs.cpython-312.pyc
 /backend/database/sqlite/logs
+backend/control/__init__.py
+backend/control/__pycache__/__init__.cpython-312.pyc
+backend/control/__pycache__/control_system.cpython-312.pyc
+backend/templates/old index copy.html
+backend/optimization/optimize_strategy_2.py
+backend/backtest/backtest_strategy copy.py
+backend/control/control_system_0.py
+/logs

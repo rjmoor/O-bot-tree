@@ -8,20 +8,13 @@ import pandas as pd
 import requests
 
 import backend.defs as defs
+from backend.utils.utility import configure_logging
 
-# Ensure the logs directory exists
-logs_dir = os.path.join(os.path.dirname(__file__), 'logs')
-if not os.path.exists(logs_dir):
-    os.makedirs(logs_dir)
 
-# Configure logging
-logging.basicConfig(
-    filename=os.path.join(logs_dir, 'Data.log'),
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s:%(message)s",
-)
+configure_logging("oanda")    
 
 class OandaAPI:
+    
     def __init__(self):
         self.session = requests.Session()
 

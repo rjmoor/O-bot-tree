@@ -1,3 +1,4 @@
+import os
 import base64
 import io
 import logging
@@ -9,30 +10,33 @@ import matplotlib
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import pandas as pd
-from flask import Flask, jsonify, redirect, render_template, request, send_file, url_for, session
+from flask import (Flask, jsonify, redirect, render_template, request,
+                send_file, session, url_for)
 from flask_assets import Bundle, Environment
-from backend.strategies.momentum_strategy import MomentumStrategy
+
+import backend.variables as variables
+from backend.backtest.backtest_strategy import BacktestStrategy
+from backend.indicators.macd_indicator import MACDIndicator
+from backend.indicators.stochastic_indicator import StochasticIndicator
+from backend.oanda_api.oanda_api import OandaAPI
+from backend.optimization.optimize_strategy import OptimizeStrategy
 from backend.strategies.ema_crossover_strategy import EMACrossoverStrategy
 from backend.strategies.ema_strategy import EMAStrategy
+from backend.strategies.momentum_strategy import MomentumStrategy
 from backend.strategies.rsi_strategy import RSIStrategy
 from backend.strategies.sma_crossover_strategy import SMACrossoverStrategy
 from backend.strategies.sma_strategy import SMAStrategy
-from backend.oanda_api.oanda_api import OandaAPI
-from backend.optimization.optimize_strategy import OptimizeStrategy
-from backend.indicators.macd_indicator import MACDIndicator
-from backend.indicators.stochastic_indicator import StochasticIndicator
-from backend.backtest.backtest_strategy import BacktestStrategy
-import backend.variables as variables
-from backend.utils.utility import configure_logging  # Import the configure_logging function
+from backend.control.control_system import ControlSystem
+from backend.utils.utility import configure_logging
 
-matplotlib.use("Agg")
-
-# Configure logging
-configure_logging()
 
 app = Flask(__name__)
-
+configure_logging("app")
+control_system = ControlSystem()
 app.secret_key = 'Rahm'
+bot_thread = None
+
+matplotlib.use("Agg")
 
 assets = Environment(app)
 scss = Bundle('static/styles/main.scss', filters='pyscss', output='static/styles/main.css')
@@ -135,64 +139,121 @@ def index():
     else:
         return f"<h1>Error: {message}</h1>", 500
 
-@app.route("/auto_trades")
-def auto_trades():
-    oanda_api = OandaAPI()
-    instruments = variables.LIVE_TRADING["TRADE_INSTRUMENTS"]
-    selected_instrument = request.args.get("instrument", instruments[0])
-    candlestick_chart = None
-
-    if request.method == "POST":
-        try:
-            instrument = request.form["instrument"]
-            units = int(request.form["units"])
-            side = request.form["side"]
-            stop_loss = request.form["stop_loss"]
-            take_profit = request.form["take_profit"]
-
-            stop_loss = float(stop_loss) if stop_loss else None
-            take_profit = float(take_profit) if take_profit else None
-
-            trade, message = oanda_api.place_trade(
-                instrument, units, side, stop_loss, take_profit
-            )
-            if trade:
-                return redirect(url_for("manual_trades", instrument=instrument))
-            else:
-                return f"<h1>Error: {message}</h1>", 500
-        except KeyError as e:
-            logging.error(f"Missing form data: {e}")
-            return f"<h1>Error: Missing form data - {e}</h1>", 400
-
-    # Get historical data and generate candlestick chart
-    data, message = oanda_api.get_historical_data(selected_instrument, "H1", 100)
-    if data is not None:
-        fig, ax = plt.subplots(figsize=(14, 10))  # Adjust the figure size for larger plot
-        mpf.plot(data, type="candle", style="charles", ax=ax)
-        img = io.BytesIO()
-        plt.savefig(img, format="png")
-        img.seek(0)
-        plt.close(fig)
-        candlestick_chart = base64.b64encode(img.getvalue()).decode()
-
-    trades, message = oanda_api.get_open_trades()
-    if trades is not None:
-        return render_template(
-            "manual_trades.html",
-            trades=trades,
-            instruments=instruments,
-            selected_instrument=selected_instrument,
-            candlestick_chart=candlestick_chart,
+@app.route("/logs")
+def fetch_logs():
+    # Create logs directory if it doesn't exist
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    try:
+        # Configure logging
+        log_filename = f'logs/app_{datetime.now().strftime("%Y%m%d")}.log'
+        logging.basicConfig(
+            filename=log_filename,
+            level=logging.INFO,
+            format='%(asctime)s %(levelname)s:%(message)s'
         )
+        logging.info('Logging configured successfully.')
+        return log_filename
+    except Exception as e:
+        logging.error(f"Error configuring logging: {e}")
+        return f"Error configuring logging: {e}"
+    
+
+@app.route("/start_bot", methods=["POST"])
+def start_bot():
+    global bot_thread
+    if not bot_thread:
+        bot_thread = Thread(target=control_system.run_analysis)
+        bot_thread.start()
+        return jsonify({"status": "success"})
     else:
-        return render_template(
-            "manual_trades.html",
-            trades=[],
-            instruments=instruments,
-            selected_instrument=selected_instrument,
-            candlestick_chart=candlestick_chart,
-            error=message,
-        )
+        return jsonify({"status": "Bot is already running"})
+
+@app.route("/stop_bot", methods=["POST"])
+def stop_bot():
+    global bot_thread
+    if bot_thread:
+        variables.STATE_MACHINE = False
+        bot_thread.join()
+        bot_thread = None
+        return jsonify({"status": "success"})
+    else:
+        return jsonify({"status": "Bot is not running"})
+
+@app.route("/execute_trades", methods=["POST"])
+def execute_trades():
+    try:
+        instruments = request.form.getlist('instruments')
+        for instrument in instruments:
+            control_system.run_analysis(instrument)
+            if control_system.current_state == variables.STATE_GREEN:
+                # Implement trade execution logic here
+                pass
+        return jsonify({"status": "Trades executed successfully."})
+    except Exception as e:
+        logging.error(f"Error executing trades: {e}")
+        return jsonify({"status": "Error executing trades.", "error": str(e)})
+
+@app.route("/auto_trades", methods=["POST"])
+def auto_trades():
+    try:
+        instruments = request.form.getlist('instruments')
+        for instrument in instruments:
+            data = control_system.get_historical_data(instrument, 'M')  # Monthly data
+            strategy = MomentumStrategy(data, rsi_params, stochastic_params)
+            report = strategy.backtest()
+            
+            if report['total_return'] > 0 and report['win_rate'] > 0.5:  # Example conditions
+                variables.current_state = variables.STATE_GREEN
+                logging.info(f"State set to GREEN for {instrument} based on monthly analysis.")
+                data = control_system.get_historical_data(instrument, 'D')  # Daily data
+                strategy = MomentumStrategy(data, rsi_params, stochastic_params)
+                report = strategy.backtest()
+                
+                if report['total_return'] > 0 and report['win_rate'] > 0.5:
+                    variables.current_state = variables.STATE_GREEN
+                    logging.info(f"State set to GREEN for {instrument} based on daily analysis.")
+                    data = control_system.get_historical_data(instrument, 'M1')  # Minute data
+                    strategy = MomentumStrategy(data, rsi_params, stochastic_params)
+                    report = strategy.backtest()
+                    
+                    if report['total_return'] > 0 and report['win_rate'] > 0.5:
+                        # Execute trade logic here
+                        logging.info(f"Executing trade for {instrument}")
+                    else:
+                        variables.current_state = variables.STATE_YELLOW
+                        logging.info(f"State set to YELLOW for {instrument} based on minute analysis.")
+                else:
+                    variables.current_state = variables.STATE_YELLOW
+                    logging.info(f"State set to YELLOW for {instrument} based on daily analysis.")
+            else:
+                variables.current_state = variables.STATE_RED
+                logging.info(f"State set to RED for {instrument} based on monthly analysis.")
+        
+        return jsonify({"status": "Auto trades executed successfully."})
+    except Exception as e:
+        logging.error(f"Error executing auto trades: {e}")
+        return jsonify({"status": "Error executing auto trades.", "error": str(e)})
+
+@app.route("/set_state", methods=["POST"])
+def set_state():
+    new_state = request.form.get('state')
+    if new_state in [variables.STATE_RED, variables.STATE_YELLOW, variables.STATE_GREEN]:
+        variables.current_state = new_state
+        logging.info(f"State changed to {new_state}")
+        return jsonify({"status": "State updated successfully.", "new_state": new_state})
+    else:
+        return jsonify({"status": "Invalid state.", "error": "Invalid state value provided."})
+
+@app.route("/select_strategy", methods=["POST"])
+def select_strategy():
+    strategy = request.form.get('strategy')
+    if strategy in ['RSI', 'SMA', 'EMA', 'MACD', 'BOLLINGER_BANDS', 'STOCHASTIC']:
+        variables.selected_strategy = strategy
+        logging.info(f"Strategy selected: {strategy}")
+        return jsonify({"status": "Strategy selected successfully.", "selected_strategy": strategy})
+    else:
+        return jsonify({"status": "Invalid strategy.", "error": "Invalid strategy value provided."})
 
 @app.route("/manual_trades", methods=["GET", "POST"])
 def manual_trades():
