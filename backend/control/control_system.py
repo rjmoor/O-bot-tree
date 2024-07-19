@@ -17,11 +17,16 @@ class ControlSystem:
     def get_historical_data(self, instrument, granularity):
         data, message = self.api.get_historical_data(instrument, granularity, 5000)
         if data is not None:
-            data['time'] = pd.to_datetime(data['time'])
-            data = data.sort_values(by='time', ascending=False)
-            return data
+            print(data.head())  # Debug: Print the first few rows of the DataFrame
+            if 'time' in data.columns:
+                data['time'] = pd.to_datetime(data['time'])
+                data = data.sort_values(by='time', ascending=False)
+                return data
+            else:
+                logging.error(f"Failed to get historical data for {instrument}: {message}")
+                return None
         else:
-            logging.error(f"Failed to get historical data for {instrument}: {message}")
+            logging.error(f"Failed to retrieve data: {message}")
             return None
 
     def analyze_instrument(self, instrument):

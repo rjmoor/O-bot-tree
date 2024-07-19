@@ -44,3 +44,5 @@ backend/optimization/optimize_strategy_2.py
 backend/backtest/backtest_strategy copy.py
 backend/control/control_system_0.py
 /logs
+backend/templates/index copy-0.html
+backend/templates/index copy-1.html

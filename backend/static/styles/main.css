@@ -49,6 +49,38 @@ body {
 }
 .content .plot img {
   max-width: 100%;
+  height: auto;
+}
+.content .controls {
+  margin-top: 20px;
+}
+.content .controls button {
+  margin-right: 10px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  background-color: #333;
+  color: #fff;
+}
+.content .controls button:hover {
+  background-color: #4d4d4d;
+}
+.content .logs {
+  margin-top: 20px;
+}
+.content .logs label {
+  display: block;
+  margin-bottom: 10px;
+  color: white;
+}
+.content .logs textarea {
+  width: 100%;
+  padding: 10px;
+  background-color: #1a1a1a;
+  border: 1px solid #555;
+  color: #fff;
+  border-radius: 5px;
 }
 .content table {
   width: 100%;
@@ -84,6 +116,11 @@ body {
 .content .form-section input, .content .form-section select {
   display: block;
   margin-top: 5px;
+  padding: 10px;
+  background-color: #121212;
+  border: 1px solid #444;
+  border-radius: 5px;
+  color: #fff;
 }
 .content .indicator-checkboxes {
   display: flex;
@@ -103,6 +140,32 @@ body {
 }
 .content .indicator-fields input {
   margin-right: 10px;
+}
+.content .status-indicator {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  margin-right: 10px;
+  background-color: #520000;
+}
+.content .status-indicator.red {
+  background-color: #ff0000;
+}
+.content .status-indicator.yellow {
+  background-color: #fff200;
+}
+.content .status-indicator.green {
+  background-color: #00ff00;
+}
+.content .status-indicator.red-off {
+  background-color: #520000;
+}
+.content .status-indicator.yellow-off {
+  background-color: #b3aa00;
+}
+.content .status-indicator.green-off {
+  background-color: #014801;
 }
 
 /*# sourceMappingURL=main.css.map */
