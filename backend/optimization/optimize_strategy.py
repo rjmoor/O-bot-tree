@@ -1,3 +1,5 @@
+from backend.backtest.backtest_strategy import BacktestStrategy
+
 class OptimizeStrategy:
     def __init__(self, data, strategy_class, param_ranges):
         self.data = data

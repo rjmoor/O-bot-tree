@@ -26,4 +26,9 @@ class SMACrossoverStrategy:
         num_trades = self.data['Position'].abs().sum()
         win_rate = (self.data['Strategy_Return'] > 0).mean()
 
-        return self.data, total_return, num_trades, win_rate
+        return {
+            'total_return': total_return,
+            'num_trades': num_trades,
+            'win_rate': win_rate,
+            'data': self.data
+        }

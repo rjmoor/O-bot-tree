@@ -1,4 +1,4 @@
-STATE_MACHINE = True 
+STATE_MACHINE = False 
 
 STATE_RED = 'red'        
 STATE_YELLOW = 'yellow'  

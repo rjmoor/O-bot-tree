@@ -1,8 +1,8 @@
-from backend.oanda_api.oanda_api import OandaAPI
-from backend import variables
 import logging
+import time
 from threading import Thread
 
+from backend import variables
 from backend.backtest.backtest_strategy import BacktestStrategy
 from backend.control.control_system import ControlSystem
 from backend.indicators.macd_indicator import MACDIndicator
@@ -16,6 +16,7 @@ from backend.strategies.rsi_strategy import RSIStrategy
 from backend.strategies.sma_crossover_strategy import SMACrossoverStrategy
 from backend.strategies.sma_strategy import SMAStrategy
 from backend.utils.utility import configure_logging
+
 
 class TradeBot:
     def __init__(self):
@@ -72,7 +73,7 @@ class TradeBot:
         _, total_return, num_trades, win_rate = strategy.backtest()
 
         # Implement trading logic based on backtest results
-        if total_return > 0:
+        if total_return > '0':
             logging.info(f"Positive return for {pair}: Execute trade")
         else:
             logging.info(f"No positive return for {pair}: Do not trade")
