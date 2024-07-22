@@ -7,6 +7,7 @@ from backend.backtest.backtest_strategy import BacktestStrategy
 from backend.control.control_system import ControlSystem
 from backend.indicators.macd_indicator import MACDIndicator
 from backend.indicators.stochastic_indicator import StochasticIndicator
+from backend.indicators.bollinger_bands_indicator import BollingerBandsIndicator
 from backend.oanda_api.oanda_api import OandaAPI
 from backend.optimization.optimize_strategy import OptimizeStrategy
 from backend.strategies.ema_crossover_strategy import EMACrossoverStrategy
@@ -28,6 +29,25 @@ class TradeBot:
             self.running = True
             self.thread = Thread(target=self.run)
             self.thread.start()
+            
+    def set_state(self, state):
+        self.state = state
+        self.execute_state_actions()
+
+    def execute_state_actions(self):
+        if self.state == 'RED':
+            self.enable_manual_trading()
+            self.check_account_info()
+            self.autofill_database()
+        elif self.state == 'GREEN':
+            self.download_historical_data()
+            self.perform_backtesting()
+            self.optimize_parameters()
+            self.enable_auto_trading()
+            self.integrate_money_management()
+        elif self.state == 'YELLOW':
+            self.confirm_momentum_strategy()
+            self.standby_for_entry()
 
     def stop(self):
         if self.running:
@@ -102,5 +122,39 @@ class TradeBot:
             return [{'STOCHASTIC_K_PERIOD': k_period, 'STOCHASTIC_D_PERIOD': d_period}
                     for k_period in params['STOCHASTIC_K_PERIOD']
                     for d_period in params['STOCHASTIC_D_PERIOD']]
+        elif 'BOLLINGER_BANDS' in params:
+            return [{'BOLLINGER_BANDS_PERIOD': period, 'BOLLINGER_BANDS_STD_DEV': std_dev}
+                    for period in params['BOLLINGER_BANDS_PERIOD']
+                    for std_dev in params['BOLLINGER_BANDS_STD_DEV']]
         else:
             return [{}]  # Default empty parameter set for strategies without additional params
+
+    def enable_manual_trading(self):
+        print("Manual trading enabled")
+
+    def check_account_info(self):
+        print("Checking account information")
+
+    def autofill_database(self):
+        print("Autofilling database")
+
+    def download_historical_data(self):
+        print("Downloading historical data")
+
+    def perform_backtesting(self):
+        print("Performing backtesting")
+
+    def optimize_parameters(self):
+        print("Optimizing parameters")
+
+    def enable_auto_trading(self):
+        print("Auto trading enabled")
+
+    def integrate_money_management(self):
+        print("Money management integrated")
+
+    def confirm_momentum_strategy(self):
+        print("Momentum strategy confirmed")
+
+    def standby_for_entry(self):
+        print("Standing by to enter position")
