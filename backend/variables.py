@@ -1,4 +1,4 @@
-STATE_MACHINE = False 
+STATE_MACHINE = True 
 
 STATE_RED = 'red'        
 STATE_YELLOW = 'yellow'  
@@ -20,7 +20,7 @@ BACKTESTING = {
 
 OPTIMIZATION_RANGES = {
     "RSI": {
-        "RSI_PERIOD": [10, 20, 30],
+        "RSI_PERIOD": [10, 20, 60],
         "RSI_OVERBOUGHT": [50, 60, 70],
         "RSI_OVERSOLD": [30, 40, 50]
     },

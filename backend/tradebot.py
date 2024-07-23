@@ -18,18 +18,24 @@ from backend.strategies.sma_crossover_strategy import SMACrossoverStrategy
 from backend.strategies.sma_strategy import SMAStrategy
 from backend.utils.utility import configure_logging
 
+from flask import Flask, jsonify
+
+app = Flask(__name__)
 
 class TradeBot:
     def __init__(self):
         self.api = OandaAPI()
+        self.control_system = ControlSystem()
         self.running = False
+        self.state = None
+        self.backtest_results = []
 
     def start(self):
         if not self.running:
             self.running = True
             self.thread = Thread(target=self.run)
             self.thread.start()
-            
+
     def set_state(self, state):
         self.state = state
         self.execute_state_actions()
@@ -60,23 +66,90 @@ class TradeBot:
             return
 
         while self.running:
-            for pair in variables.LIVE_TRADING["TRADE_INSTRUMENTS"]:
-                granularity = variables.LIVE_TRADING["TRADING_GRANULARITY"]
-                count = variables.LIVE_TRADING["TRADING_COUNT"]
-                data, message = self.api.get_historical_data(pair, granularity, count)
-                if data is not None:
-                    for strategy_name, params in variables.OPTIMIZATION_RANGES.items():
-                        strategy_class = self.get_strategy_class(strategy_name)
-                        if strategy_class:
-                            param_sets = self.create_param_sets(params)
-                            
-                            for param_set in param_sets:
-                                optimizer = OptimizeStrategy(data, strategy_class, [param_set])
-                                optimization_results = optimizer.optimize()
-                                self.execute_trade(pair, optimization_results, data, param_set)
-                else:
-                    logging.error(f"Failed to get historical data for {pair}: {message}")
+            self.execute_state_actions()
             time.sleep(3600)  # Run every hour
+
+    def enable_manual_trading(self):
+        logging.info("Manual trading enabled.")
+        # Implement manual trading logic if needed.
+        # For example, provide an interface to manually input trades.
+
+    def check_account_info(self):
+        account_info = self.api.get_account_info()
+        if account_info:
+            logging.info(f"Account Info: {account_info}")
+        else:
+            logging.error("Failed to retrieve account information.")
+
+    def autofill_database(self):
+        # Assume you have a method to autofill the database
+        success = self.api.autofill_database()
+        if success:
+            logging.info("Database autofilled successfully.")
+        else:
+            logging.error("Failed to autofill the database.")
+
+    def download_historical_data(self):
+        for pair in variables.LIVE_TRADING["TRADE_INSTRUMENTS"]:
+            logging.info(f"Analyzing {pair} at {variables.LIVE_TRADING['TRADING_GRANULARITY']} level.")
+            granularity = variables.LIVE_TRADING["TRADING_GRANULARITY"]
+            count = variables.LIVE_TRADING["TRADING_COUNT"]
+            data, message = self.api.get_historical_data(pair, granularity, count)
+            if data is not None:
+                logging.info(f"Successfully retrieved historical data for {pair}.")
+                # Process the data here if needed
+            else:
+                logging.error(f"Failed to get historical data for {pair}: {message}")
+
+    def perform_backtesting(self):
+        self.backtest_results = []  # Clear previous results
+        for pair in variables.LIVE_TRADING["TRADE_INSTRUMENTS"]:
+            granularity = variables.LIVE_TRADING["TRADING_GRANULARITY"]
+            count = variables.LIVE_TRADING["TRADING_COUNT"]
+            data, message = self.api.get_historical_data(pair, granularity, count)
+            if data is not None:
+                for strategy_name, params in variables.OPTIMIZATION_RANGES.items():
+                    strategy_class = self.get_strategy_class(strategy_name)
+                    if strategy_class:
+                        param_sets = self.create_param_sets(params)
+                        for param_set in param_sets:
+                            strategy = strategy_class(data, **param_set)
+                            results = strategy.backtest()
+                            self.store_backtest_results(pair, strategy_name, param_set, results)
+            else:
+                logging.error(f"Failed to download historical data for {pair}: {message}")
+
+    def optimize_parameters(self):
+        for pair in variables.LIVE_TRADING["TRADE_INSTRUMENTS"]:
+            granularity = variables.LIVE_TRADING["TRADING_GRANULARITY"]
+            count = variables.LIVE_TRADING["TRADING_COUNT"]
+            data, message = self.api.get_historical_data(pair, granularity, count)
+            if data is not None:
+                for strategy_name, params in variables.OPTIMIZATION_RANGES.items():
+                    strategy_class = self.get_strategy_class(strategy_name)
+                    if strategy_class:
+                        param_sets = self.create_param_sets(params)
+                        optimizer = OptimizeStrategy(data, strategy_class, param_sets)
+                        optimization_results = optimizer.optimize()
+                        logging.info(f"Optimized parameters for {pair} using {strategy_name}.")
+            else:
+                logging.error(f"Failed to download historical data for {pair}: {message}")
+
+    def enable_auto_trading(self):
+        logging.info("Auto trading enabled.")
+        # Implement auto trading logic, e.g., initiate trades based on signals from strategies.
+
+    def integrate_money_management(self):
+        logging.info("Money management integrated.")
+        # Implement money management rules, such as risk management, position sizing, etc.
+
+    def confirm_momentum_strategy(self):
+        logging.info("Momentum strategy confirmed. No entry at the moment.")
+        # Implement logic to check momentum strategy without executing trades.
+
+    def standby_for_entry(self):
+        logging.info("Standing by to enter position based on momentum strategy.")
+        # Implement logic to monitor the market and be ready to execute trades when conditions are met.
 
     def execute_trade(self, pair, optimization_results, data, param_set):
         rsi_params = {
@@ -90,13 +163,27 @@ class TradeBot:
         }
 
         strategy = MomentumStrategy(data, rsi_params, stochastic_params)
-        _, total_return, num_trades, win_rate = strategy.backtest()
+        results = strategy.backtest()
+        self.store_backtest_results(pair, 'Momentum', param_set, results)
 
         # Implement trading logic based on backtest results
-        if total_return > '0':
+        if results['total_return'] > 0:
             logging.info(f"Positive return for {pair}: Execute trade")
         else:
             logging.info(f"No positive return for {pair}: Do not trade")
+
+    def store_backtest_results(self, pair, strategy_name, param_set, results):
+        total_return, num_trades, win_rate = results['total_return'], results['num_trades'], results['win_rate']
+        self.backtest_results.append({
+            'pair': pair,
+            'strategy': strategy_name,
+            'params': param_set,
+            'total_return': total_return,
+            'num_trades': num_trades,
+            'win_rate': win_rate
+        })
+        logging.info(f"Backtest results for {pair} using {strategy_name} with parameters {param_set}:")
+        logging.info(f"Total Return: {total_return}, Number of Trades: {num_trades}, Win Rate: {win_rate}")
 
     def get_strategy_class(self, strategy_name):
         strategy_classes = {
@@ -129,32 +216,18 @@ class TradeBot:
         else:
             return [{}]  # Default empty parameter set for strategies without additional params
 
-    def enable_manual_trading(self):
-        print("Manual trading enabled")
+@app.route('/start-backtest', methods=['POST'])
+def start_backtest():
+    trade_bot.perform_backtesting()
+    return jsonify({"message": "Backtest started"}), 200
 
-    def check_account_info(self):
-        print("Checking account information")
+@app.route('/backtest-results', methods=['GET'])
+def get_backtest_results():
+    return jsonify(trade_bot.backtest_results)
 
-    def autofill_database(self):
-        print("Autofilling database")
-
-    def download_historical_data(self):
-        print("Downloading historical data")
-
-    def perform_backtesting(self):
-        print("Performing backtesting")
-
-    def optimize_parameters(self):
-        print("Optimizing parameters")
-
-    def enable_auto_trading(self):
-        print("Auto trading enabled")
-
-    def integrate_money_management(self):
-        print("Money management integrated")
-
-    def confirm_momentum_strategy(self):
-        print("Momentum strategy confirmed")
-
-    def standby_for_entry(self):
-        print("Standing by to enter position")
+# Example usage
+if __name__ == '__main__':
+    trade_bot = TradeBot()
+    trade_bot.set_state('GREEN')
+    trade_bot.start()
+    app.run(host='0.0.0.0', port=5000)
