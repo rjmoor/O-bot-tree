@@ -242,6 +242,31 @@ def positions():
     else:
         return f"<h1>Error: {message}</h1>", 500
 
+@app.route('/start-backtest', methods=['POST'])
+def start_backtest():
+    trade_bot.perform_backtesting()
+    # Create plot
+    fig, ax = plt.subplots()
+    ax.plot(trade_bot.backtest_data['time'], trade_bot.backtest_data['close'], label="Close Price")
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Close Price')
+    ax.legend()
+
+    # Save plot to a string in base64 format
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    image_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close(fig)
+
+    return jsonify({"message": "Backtest started", "plot": image_base64}), 200
+
+
+@app.route('/backtest-results', methods=['GET'])
+def get_backtest_results():
+    return jsonify(trade_bot.backtest_results)
+
+
 @app.route("/backtest", methods=["GET", "POST"])
 def backtest():
     if request.method == "POST":

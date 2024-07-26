@@ -9,7 +9,7 @@ const BacktestResults = () => {
     useEffect(() => {
         const fetchResults = async () => {
             try {
-                const response = await axios.get('http://localhost:5000/backtest-results');
+                const response = await axios.get('http://192.168.1.73:5000/backtest-results'); // Update with your backend's IP and port
                 setResults(response.data);
             } catch (error) {
                 console.error('Error fetching backtest results:', error);

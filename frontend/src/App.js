@@ -1,21 +1,23 @@
-import React, { Component } from "react";
-import logo from "./logo.svg";
-import "./App.css";
+// src/App.js
+import React from 'react';
+import AccountInfo from './components/AccountInfo';
+import BacktestResults from './components/BacktestResults';
+import BacktestPlot from './components/BacktestPlot';
+import './App.css';
 
-class App extends Component {
-	render() {
-		return (
-			<div className="App">
-				<div className="App-header">
-					<img src={logo} className="App-logo" alt="logo" />
-					<h2>Welcome to Trader</h2>
-				</div>
-				<p className="App-intro">
-					To get started, edit <code>src/App.js</code> and save to reload.
-				</p>
-			</div>
-		);
-	}
+function App() {
+    return (
+        <div className="App">
+            <header className="App-header">
+                <h1>Trading Dashboard</h1>
+            </header>
+            <main>
+                <AccountInfo />
+                <BacktestPlot />
+                <BacktestResults />
+            </main>
+        </div>
+    );
 }
 
 export default App;

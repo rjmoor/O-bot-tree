@@ -7,6 +7,13 @@
     "react-dom": "^18.3.1",
     "react-scripts": "^5.0.1"
   },
+  "dev Dependencies": {
+    "@testing-library/jest-dom": "^5.16.1",
+    "@testing-library/react": "^12.1.2",
+    "@testing-library/user-event": "^13.5.0",
+    "web-vitals": "^2.1.2",
+    "@babel/plugin-proposal-private-property-in-object": "^7.16.7"
+  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",

@@ -1,4 +1,4 @@
-STATE_MACHINE = True 
+STATE_MACHINE = False 
 
 STATE_RED = 'red'        
 STATE_YELLOW = 'yellow'  
@@ -50,7 +50,7 @@ OPTIMIZATION_RANGES = {
 }
 
 LIVE_TRADING = {
-    "TRADE_INSTRUMENTS" : ["EUR_USD", "GBP_USD", "USD_JPY"],
+    "TRADE_INSTRUMENTS" : ["EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD", "NZD_USD", "USD_CHF"],
     "TRADE_UNITS" : 1000,
     "TRADING_COUNT" : 100,
     "GRANULARITY" : ["M1", "M5", "M15", "M30", "H1", "H4", "D"],

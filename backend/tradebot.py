@@ -75,16 +75,14 @@ class TradeBot:
         # For example, provide an interface to manually input trades.
 
     def check_account_info(self):
-        account_info = self.api.get_account_info()
-        if account_info:
+        if (account_info := self.api.get_account_info()):
             logging.info(f"Account Info: {account_info}")
         else:
             logging.error("Failed to retrieve account information.")
 
     def autofill_database(self):
         # Assume you have a method to autofill the database
-        success = self.api.autofill_database()
-        if success:
+        if (success := self.api.autofill_database()):
             logging.info("Database autofilled successfully.")
         else:
             logging.error("Failed to autofill the database.")
@@ -109,8 +107,7 @@ class TradeBot:
             data, message = self.api.get_historical_data(pair, granularity, count)
             if data is not None:
                 for strategy_name, params in variables.OPTIMIZATION_RANGES.items():
-                    strategy_class = self.get_strategy_class(strategy_name)
-                    if strategy_class:
+                    if strategy_class := self.get_strategy_class(strategy_name):
                         param_sets = self.create_param_sets(params)
                         for param_set in param_sets:
                             strategy = strategy_class(data, **param_set)
@@ -126,8 +123,7 @@ class TradeBot:
             data, message = self.api.get_historical_data(pair, granularity, count)
             if data is not None:
                 for strategy_name, params in variables.OPTIMIZATION_RANGES.items():
-                    strategy_class = self.get_strategy_class(strategy_name)
-                    if strategy_class:
+                    if strategy_class := self.get_strategy_class(strategy_name):
                         param_sets = self.create_param_sets(params)
                         optimizer = OptimizeStrategy(data, strategy_class, param_sets)
                         optimization_results = optimizer.optimize()
@@ -193,7 +189,7 @@ class TradeBot:
             'SMACrossover': SMACrossoverStrategy,
             'EMACrossover': EMACrossoverStrategy
         }
-        return strategy_classes.get(strategy_name, None)
+        return strategy_classes.get(strategy_name)
 
     def create_param_sets(self, params):
         if 'RSI_PERIOD' in params:
@@ -216,16 +212,6 @@ class TradeBot:
         else:
             return [{}]  # Default empty parameter set for strategies without additional params
 
-@app.route('/start-backtest', methods=['POST'])
-def start_backtest():
-    trade_bot.perform_backtesting()
-    return jsonify({"message": "Backtest started"}), 200
-
-@app.route('/backtest-results', methods=['GET'])
-def get_backtest_results():
-    return jsonify(trade_bot.backtest_results)
-
-# Example usage
 if __name__ == '__main__':
     trade_bot = TradeBot()
     trade_bot.set_state('GREEN')
