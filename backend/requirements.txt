@@ -4,3 +4,4 @@ matplotlib
 mplfinance
 pandas
 requests
+python-dotenv
