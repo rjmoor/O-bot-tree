@@ -10,6 +10,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 from backend import variables
+from backend.variables import STATE_MACHINE
 from flask import (Flask, jsonify, redirect, render_template, request,
                 send_file, session, url_for)
 from flask_assets import Bundle, Environment
@@ -50,7 +51,7 @@ def index():
     oanda_api = OandaAPI()
     account_info, message = oanda_api.check_account()
     if account_info:
-        return render_template("index.html", account_info=account_info)
+        return render_template("index.html", account_info=account_info, state_machine=STATE_MACHINE)
     else:
         return f"<h1>Error: {message}</h1>", 500
 
@@ -148,15 +149,21 @@ def auto_trades():
         logging.error(f"Error executing auto trades: {e}")
         return jsonify({"status": "Error executing auto trades.", "error": str(e)})
 
-@app.route("/set_state", methods=["POST"])
+@app.route('/get_state', methods=['GET'])
+def get_state():
+    state = 'on' if STATE_MACHINE else 'off'
+    return jsonify({'state': state, 'status': 'success'})
+
+@app.route('/set_state', methods=['POST'])
 def set_state():
+    global STATE_MACHINE
     new_state = request.form.get('state')
-    if new_state in [variables.STATE_RED, variables.STATE_YELLOW, variables.STATE_GREEN]:
-        variables.current_state = new_state
+    data = request.json
+    if ('state' in data or new_state == 'on'):
+        STATE_MACHINE = data['state'] == 'on'
         logging.info(f"State changed to {new_state}")
         return jsonify({"status": "State updated successfully.", "new_state": new_state})
-    else:
-        return jsonify({"status": "Invalid state.", "error": "Invalid state value provided."})
+    return jsonify({"status": "Invalid state.", "error": "Invalid state value provided."})
 
 @app.route("/select_strategy", methods=["POST"])
 def select_strategy():
@@ -234,6 +241,31 @@ def positions():
         return render_template("positions.html", positions=positions)
     else:
         return f"<h1>Error: {message}</h1>", 500
+
+@app.route('/start-backtest', methods=['POST'])
+def start_backtest():
+    trade_bot.perform_backtesting()
+    # Create plot
+    fig, ax = plt.subplots()
+    ax.plot(trade_bot.backtest_data['time'], trade_bot.backtest_data['close'], label="Close Price")
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Close Price')
+    ax.legend()
+
+    # Save plot to a string in base64 format
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    image_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close(fig)
+
+    return jsonify({"message": "Backtest started", "plot": image_base64}), 200
+
+
+@app.route('/backtest-results', methods=['GET'])
+def get_backtest_results():
+    return jsonify(trade_bot.backtest_results)
+
 
 @app.route("/backtest", methods=["GET", "POST"])
 def backtest():

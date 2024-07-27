@@ -27,15 +27,9 @@ class SMAStrategy:
         num_trades = self.data['Position'].abs().sum()
         win_rate = (self.data['Strategy_Return'] > 0).mean()
 
-        return self.data, total_return, num_trades, win_rate
-
-    def optimize(self, data: pd.DataFrame, param_range: list) -> dict:
-        best_params = None
-        best_performance = -float('inf')
-        for param in param_range:
-            self.period = param
-            _, total_return, _, _ = self.backtest(data)
-            if total_return > best_performance:
-                best_performance = total_return
-                best_params = {'period': param}
-        return {'best_params': best_params, 'performance': best_performance}
+        return {
+            'total_return': total_return,
+            'num_trades': num_trades,
+            'win_rate': win_rate,
+            'data': self.data
+        }

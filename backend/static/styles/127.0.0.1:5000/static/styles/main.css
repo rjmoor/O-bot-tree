@@ -15,11 +15,6 @@
   height: 30px;
   border-radius: 50%;
   margin: 5px 0;
-  opacity: 0.3;
-}
-
-.light.on {
-  opacity: 1;
 }
 
 .red-light {
@@ -128,20 +123,18 @@ body {
   margin: 5px 0;
 }
 .controls .top-row .traffic-light .red-light {
-  background-color: #ff0000;
+  background-color: #520000;
 }
 .controls .top-row .traffic-light .yellow-light {
-  background-color: rgba(255, 242, 0, 0.2549019608);
+  background-color: #b3aa00;
 }
 .controls .top-row .traffic-light .green-light {
-  background-color: rgba(0, 255, 0, 0.1960784314);
+  background-color: #014801;
 }
 .controls .top-row .traffic-light .light.on {
   background-color: currentColor;
 }
 .controls .top-row button {
-  width: 100px;
-  height: 50px;
   margin-right: 10px;
   padding: 10px 20px;
   border: none;
@@ -223,7 +216,7 @@ body {
   margin: 0 auto;
 }
 .controls .indicator-status .indicator .status-indicator.RSI {
-  background-color: #ff0000;
+  background-color: #014801;
 }
 .controls .indicator-status .indicator .status-indicator.SMA {
   background-color: #b3aa00;

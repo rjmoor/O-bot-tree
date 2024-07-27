@@ -18,8 +18,8 @@ class RSIStrategy:
     def generate_signal(self):
         self.data = self.calculate_rsi()
         self.data['Signal'] = 0
-        self.data['Signal'][self.data['RSI'] > self.RSI_OVERBOUGHT] = -1
-        self.data['Signal'][self.data['RSI'] < self.RSI_OVERSOLD] = 1
+        self.data.loc[self.data['RSI'] > self.RSI_OVERBOUGHT, 'Signal'] = -1
+        self.data.loc[self.data['RSI'] < self.RSI_OVERSOLD, 'Signal'] = 1
         self.data['Position'] = self.data['Signal'].shift()
         return self.data
 
@@ -31,4 +31,10 @@ class RSIStrategy:
         total_return = self.data['Cumulative_Return'].iloc[-1]
         num_trades = self.data['Position'].diff().fillna(0).abs().sum() / 2
         win_rate = len(self.data[self.data['Strategy'] > 0]) / num_trades if num_trades != 0 else 0
-        return self.data, total_return, num_trades, win_rate
+
+        return {
+            'total_return': total_return,
+            'num_trades': num_trades,
+            'win_rate': win_rate,
+            'data': self.data
+        }
