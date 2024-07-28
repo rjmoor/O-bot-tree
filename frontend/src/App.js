@@ -3,6 +3,7 @@ import React from 'react';
 import AccountInfo from './components/AccountInfo';
 import BacktestResults from './components/BacktestResults';
 import BacktestPlot from './components/BacktestPlot';
+import PerformanceAnalytics from './components/PerformanceAnalytics';
 import './App.css';
 
 function App() {

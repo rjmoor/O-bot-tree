@@ -3,6 +3,7 @@ import time
 from threading import Thread
 
 from backend import variables
+from backend.utils import historical
 from backend.backtest.backtest_strategy import BacktestStrategy
 from backend.control.control_system import ControlSystem
 from backend.indicators.macd_indicator import MACDIndicator
@@ -35,7 +36,7 @@ class TradeBot:
             self.running = True
             self.thread = Thread(target=self.run)
             self.thread.start()
-
+            
     def set_state(self, state):
         self.state = state
         self.execute_state_actions()

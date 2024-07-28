@@ -27,7 +27,7 @@ const AccountInfo = () => {
         <div className="account-info">
             <h2>Account Information</h2>
             <p><strong>Account ID:</strong> {accountInfo.account_id}</p>
-            <p><strong>Balance:</strong> {accountInfo.balance}</p>
+            <p><strong>Balance: </strong> {accountInfo.balance}</p>
             <p><strong>Margin Available:</strong> {accountInfo.margin_available}</p>
             <p><strong>Margin Used:</strong> {accountInfo.margin_used}</p>
         </div>

@@ -22,6 +22,15 @@ class StochasticIndicator:
                         (-1 if row['%K'] < row['%D'] and row['%K'] > 80 else 0), axis=1
         )
         return data
+    
+    def check_green_light(self, data: pd.DataFrame) -> bool:
+        # Ensure the data has been processed with generate_signal
+        if 'Stochastic_Signal' not in data.columns:
+            data = self.generate_signal(data)
+        
+        # Check for green light condition
+        latest_signal = data.iloc[-1]['Stochastic_Signal']
+        return latest_signal == 1
 
     def get_signal_state(self, data: pd.DataFrame) -> str:
         if 'Stochastic_Signal' not in data.columns:
