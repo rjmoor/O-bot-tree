@@ -1,6 +1,10 @@
+import logging
 import pandas as pd
 from backend.strategies.rsi_strategy import RSIStrategy
 from backend.indicators.stochastic_indicator import StochasticIndicator
+from backend.utils.utility import configure_logging
+
+configure_logging("momentum_strategy")
 
 class MomentumStrategy:
     def __init__(self, data, rsi_params, stochastic_params):
@@ -29,8 +33,11 @@ class MomentumStrategy:
 
         # Combine RSI and Stochastic signals
         self.data['Combined_Signal'] = self.data['Signal']
+        logging.info(f"Combined Signal: {self.data['Combined_Signal'].value_counts()}")
+        
 
     def backtest(self):
+        logging.info(f"Analyzing the backtest...")        
         self.generate_signals()
         self.data['Position'] = self.data['Combined_Signal'].shift()
         self.data['Return'] = self.data['close'].pct_change()

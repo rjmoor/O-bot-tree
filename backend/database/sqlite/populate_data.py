@@ -2,33 +2,26 @@ import json
 import logging
 import os
 import sqlite3
-import time
 from datetime import datetime
 
 import pandas as pd
 import requests
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, exc  
 
-import defs 
+import backend.defs as defs
+from backend.utils.utility import configure_logging
 
 class PopulateHistory:
-    def __init__(self, db_name='forex_data.db'):
+    def __init__(self, db_name='backend/database/sqlite/forex_data.db'):
+        self.db_name = db_name
         self.conn = sqlite3.connect(db_name)
         self.engine = create_engine(f'sqlite:///{db_name}')
         self.api = OandaAPI()
         self.setup_logging()
     
     def setup_logging(self):
-        # Create logs directory if it doesn't exist
-        if not os.path.exists('logs'):
-            os.makedirs('logs')
-        # Configure logging
-        logging.basicConfig(
-            filename=f'logs/populate_history_{datetime.now().strftime("%Y%m%d")}.log',
-            level=logging.INFO,
-            format='%(asctime)s %(levelname)s:%(message)s'
-        )
-        logging.info('Logging configured successfully.')
+        configure_logging("populate_data")
+        logging.info('Logging populate_data configured successfully.')
     
     def create_tables(self, instrument):
         try:
@@ -80,17 +73,22 @@ class PopulateHistory:
                 print(f"Populated {table_name} with {granularity} data for {instrument}")
             else:
                 logging.error(f"Failed to get historical data for {instrument}: {message}")
-        except Exception as e:
+        except (exc.SQLAlchemyError, Exception) as e:
             logging.error(f"Error populating table {table_name} for {instrument}: {e}")
 
     def populate_all_instruments(self):
         try:
-            instruments = self.api.get_instruments()  # Assuming this method returns a list of all instruments
+            instruments = self.api.get_instruments()
+            if not instruments:
+                logging.error("No instruments retrieved from API.")
+                return
+
             for instrument in instruments:
                 self.create_tables(instrument)
                 self.populate_table(instrument, 'D', f'{instrument}_daily')
                 self.populate_table(instrument, 'M', f'{instrument}_monthly')
                 self.populate_table(instrument, 'M1', f'{instrument}_minute')
+
             logging.info("All instruments populated successfully.")
         except Exception as e:
             logging.error(f"Error populating instruments: {e}")
@@ -123,6 +121,7 @@ class OandaAPI:
                     "low": candle["mid"]["l"],
                     "close": candle["mid"]["c"]
                 } for candle in data["candles"]])
+                print("PRCode: populate_data - I got historical data here!")
                 return df, "Success"
             else:
                 return None, response.text

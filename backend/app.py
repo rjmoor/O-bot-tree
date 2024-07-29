@@ -107,25 +107,47 @@ def indicator_status():
     # Replace with actual indicator status fetching logic
     indicator_data = fetch_indicator_status(instrument)
     if not indicator_data:
+        logging.error(f'Indicator data not found for {instrument}')
         return jsonify({'error': 'Indicator data not found'}), 404
     return jsonify(indicator_data)
 
 def fetch_indicator_status(instrument):
-    api = OandaAPI()  # Assuming you have an instance of OandaAPI to fetch data
+    api = OandaAPI()
+    
+    # Adjust the instrument name if necessary
+    if instrument.startswith('OANDA:'):
+        instrument = instrument.replace('OANDA:', '')
+    
+    # Fetch data from the API
+    data, message = api.get_historical_data(instrument, granularity='D', count=500)
+    if data is None:
+        logging.error(f"Error fetching historical data for {instrument}: {message}")
+        return {'error': message}
+    
     indicators = {
-        'RSI': RSIIndicator,
-        'SMA': SMAIndicator,
-        'EMA': EMAIndicator,
-        'MACD': MACDIndicator,
-        'BollingerBands': BollingerBandsIndicator,
-        'Stochastic': StochasticIndicator
+        'RSI': lambda: RSIIndicator(variables.SETTINGS['INDICATORS']['RSI']['RSI_PERIOD']).get_current_value(data),
+        'SMA': lambda: SMAIndicator(variables.SETTINGS['INDICATORS']['SMA']['SMA_PERIOD']).get_current_value(data),
+        'EMA': lambda: EMAIndicator(variables.SETTINGS['INDICATORS']['EMA']['EMA_PERIOD']).get_current_value(data),
+        'MACD': lambda: MACDIndicator(
+            variables.SETTINGS['INDICATORS']['MACD']['MACD_FAST_PERIOD'],
+            variables.SETTINGS['INDICATORS']['MACD']['MACD_SLOW_PERIOD'],
+            variables.SETTINGS['INDICATORS']['MACD']['MACD_SIGNAL_PERIOD']
+        ).get_current_value(data),
+        'BollingerBands': lambda: BollingerBandsIndicator(
+            variables.SETTINGS['INDICATORS']['BOLLINGER_BANDS']['BOLLINGER_BANDS_PERIOD'],
+            variables.SETTINGS['INDICATORS']['BOLLINGER_BANDS']['BOLLINGER_BANDS_STD_DEV']
+        ).get_current_value(data),
+        'Stochastic': lambda: StochasticIndicator(
+            api, instrument,
+            variables.SETTINGS['INDICATORS']['STOCHASTIC']['STOCHASTIC_K_PERIOD'],
+            variables.SETTINGS['INDICATORS']['STOCHASTIC']['STOCHASTIC_D_PERIOD']
+        ).get_current_value(data)
     }
 
     status = {}
-    for name, IndicatorClass in indicators.items():
+    for name, get_value in indicators.items():
         try:
-            indicator = IndicatorClass(api, instrument)
-            value = indicator.get_current_value()
+            value = get_value()
             status[name] = evaluate_indicator_status(name, value)
         except Exception as e:
             logging.error(f"Error fetching {name} for {instrument}: {str(e)}")
@@ -134,26 +156,42 @@ def fetch_indicator_status(instrument):
     return status
 
 def evaluate_indicator_status(name, value):
-    # This is a simple example. Adjust thresholds as needed for your use case.
     thresholds = {
-        'RSI': {'high': variables.RSI_OVERBOUGHT, 'low': variables.RSI_OVERSOLD},
-        'SMA': {'high': 50, 'low': 50},  # Example thresholds
-        'EMA': {'high': 50, 'low': 50},  # Example thresholds
-        'MACD': {'high': 0, 'low': 0},  # Example thresholds
-        'BollingerBands': {'high': 1, 'low': -1},  # Example thresholds
-        'Stochastic': {'high': 80, 'low': 20}  # Example thresholds
+        'RSI': {'high': variables.SETTINGS['INDICATORS']['RSI']['RSI_OVERBOUGHT'], 'low': variables.SETTINGS['INDICATORS']['RSI']['RSI_OVERSOLD']},
+        'SMA': {'high': variables.SETTINGS['INDICATORS']['SMA']['Slow_Period'], 'low': variables.SETTINGS['INDICATORS']['SMA']['Fast_Period']},
+        'EMA': {'high': variables.SETTINGS['INDICATORS']['EMA']['Slow_Period'], 'low': variables.SETTINGS['INDICATORS']['EMA']['Fast_Period']},
+        'MACD': {'high': 0, 'low': 0},  # MACD thresholds are not defined in the provided settings
+        'BollingerBands': {'high': 1, 'low': -1},  # Example thresholds, adjust as needed
+        'Stochastic': {'high': 80, 'low': 20}  # Example thresholds, adjust as needed
     }
 
     if name not in thresholds:
         return 'unknown'
 
-    if value > thresholds[name]['high']:
-        return 'green'
-    elif value < thresholds[name]['low']:
-        return 'red'
+    if value is None:
+        return 'error'
+
+    if name == 'MACD':
+        if value > thresholds[name]['high']:
+            return 'green'
+        elif value < thresholds[name]['low']:
+            return 'red'
+        else:
+            return 'yellow'
+    elif name == 'BollingerBands':
+        if value['price'] > value['upper']:
+            return 'green'
+        elif value['price'] < value['lower']:
+            return 'red'
+        else:
+            return 'yellow'
     else:
-        return 'yellow'
-    
+        if value > thresholds[name]['high']:
+            return 'green'
+        elif value < thresholds[name]['low']:
+            return 'red'
+        else:
+            return 'yellow'
 
 @app.route("/execute_trades", methods=["POST"])
 def execute_trades():

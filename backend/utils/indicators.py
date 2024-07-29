@@ -38,6 +38,10 @@ class SMAIndicator:
         data['Position'] = data['Signal'].diff()
         return data
 
+    def get_current_value(self, data: pd.DataFrame) -> float:
+        self.apply(data)
+        return data['SMA'].iloc[-1]
+
 class EMAIndicator:
     def __init__(self, period):
         self.period = period
@@ -48,6 +52,10 @@ class EMAIndicator:
         data['Signal'][self.period:] = np.where(data['close'][self.period:] > data['EMA'][self.period:], 1, -1)
         data['Position'] = data['Signal'].diff()
         return data
+
+    def get_current_value(self, data: pd.DataFrame) -> float:
+        self.apply(data)
+        return data['EMA'].iloc[-1]
 
 class RSIIndicator:
     def __init__(self, period):
@@ -64,6 +72,10 @@ class RSIIndicator:
         data['Position'] = data['Signal'].diff()
         return data
 
+    def get_current_value(self, data: pd.DataFrame) -> float:
+        self.apply(data)
+        return data['RSI'].iloc[-1]
+
 class MACDIndicator:
     def __init__(self, fast_period, slow_period, signal_period):
         self.fast_period = fast_period
@@ -79,7 +91,11 @@ class MACDIndicator:
         data['Signal'][self.signal_period:] = np.where(data['MACD'][self.signal_period:] > data['Signal_Line'][self.signal_period:], 1, -1)
         data['Position'] = data['Signal'].diff()
         return data
-    
+
+    def get_current_value(self, data: pd.DataFrame) -> float:
+        self.apply(data)
+        return data['MACD'].iloc[-1]
+
 class BollingerBandsIndicator:
     def __init__(self, period, std_dev):
         self.period = period
@@ -94,3 +110,11 @@ class BollingerBandsIndicator:
         data['Signal'][self.period:] = np.where(data['close'][self.period:] > data['Upper_Band'][self.period:], -1, np.where(data['close'][self.period:] < data['Lower_Band'][self.period:], 1, 0))
         data['Position'] = data['Signal'].diff()
         return data
+
+    def get_current_value(self, data: pd.DataFrame) -> dict:
+        self.apply(data)
+        return {
+            'upper': data['Upper_Band'].iloc[-1],
+            'lower': data['Lower_Band'].iloc[-1],
+            'price': data['close'].iloc[-1]
+        }

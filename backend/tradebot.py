@@ -30,31 +30,37 @@ class TradeBot:
         self.running = False
         self.state = None
         self.backtest_results = []
+        self.thread = None
 
     def start(self):
         if not self.running:
             self.running = True
-            self.thread = Thread(target=self.run)
-            self.thread.start()
+            if self.thread is None or not self.thread.is_alive():
+                self.thread = Thread(target=self.run)
+                self.thread.start()
             
     def set_state(self, state):
         self.state = state
         self.execute_state_actions()
 
-    def execute_state_actions(self):
+    def execute_state_actions(self, sec):
+        self.sec = sec
         if self.state == 'RED':
             self.enable_manual_trading()
             self.check_account_info()
             self.autofill_database()
+            self.sec = 180  # Run every three minutes
         elif self.state == 'GREEN':
             self.download_historical_data()
             self.perform_backtesting()
             self.optimize_parameters()
             self.enable_auto_trading()
             self.integrate_money_management()
+            self.sec = 120  # Run every two minutes
         elif self.state == 'YELLOW':
             self.confirm_momentum_strategy()
             self.standby_for_entry()
+            self.sec = 30  # Run every half of  minute
 
     def stop(self):
         if self.running:
@@ -67,8 +73,8 @@ class TradeBot:
             return
 
         while self.running:
-            self.execute_state_actions()
-            time.sleep(3600)  # Run every hour
+            self.execute_state_actions(self.sec)
+            time.sleep(self.sec)  # Run every interval minute(s)
 
     def enable_manual_trading(self):
         logging.info("Manual trading enabled.")
@@ -89,22 +95,21 @@ class TradeBot:
             logging.error("Failed to autofill the database.")
 
     def download_historical_data(self):
-        for pair in variables.LIVE_TRADING["TRADE_INSTRUMENTS"]:
-            logging.info(f"Analyzing {pair} at {variables.LIVE_TRADING['TRADING_GRANULARITY']} level.")
-            granularity = variables.LIVE_TRADING["TRADING_GRANULARITY"]
-            count = variables.LIVE_TRADING["TRADING_COUNT"]
+        for pair in variables.AUTO_TRADING["TRADE_INSTRUMENTS"]:
+            logging.info(f"Analyzing {pair} at {variables.AUTO_TRADING['TRADING_GRANULARITY']} level.")
+            granularity = variables.AUTO_TRADING["TRADING_GRANULARITY"]
+            count = variables.AUTO_TRADING["TRADING_COUNT"]
             data, message = self.api.get_historical_data(pair, granularity, count)
-            if data is not None:
+            if data is not None and not data.empty:
                 logging.info(f"Successfully retrieved historical data for {pair}.")
-                # Process the data here if needed
             else:
-                logging.error(f"Failed to get historical data for {pair}: {message}")
+                logging.error(f"Failed to get historical data again for {pair}: {message}")
 
     def perform_backtesting(self):
         self.backtest_results = []  # Clear previous results
-        for pair in variables.LIVE_TRADING["TRADE_INSTRUMENTS"]:
-            granularity = variables.LIVE_TRADING["TRADING_GRANULARITY"]
-            count = variables.LIVE_TRADING["TRADING_COUNT"]
+        for pair in variables.AUTO_TRADING["TRADE_INSTRUMENTS"]:
+            granularity = variables.AUTO_TRADING["TRADING_GRANULARITY"]
+            count = variables.AUTO_TRADING["TRADING_COUNT"]
             data, message = self.api.get_historical_data(pair, granularity, count)
             if data is not None:
                 for strategy_name, params in variables.OPTIMIZATION_RANGES.items():
@@ -115,12 +120,12 @@ class TradeBot:
                             results = strategy.backtest()
                             self.store_backtest_results(pair, strategy_name, param_set, results)
             else:
-                logging.error(f"Failed to download historical data for {pair}: {message}")
+                logging.error(f"Failed to perform backtesting for {pair}: {message}")
 
     def optimize_parameters(self):
-        for pair in variables.LIVE_TRADING["TRADE_INSTRUMENTS"]:
-            granularity = variables.LIVE_TRADING["TRADING_GRANULARITY"]
-            count = variables.LIVE_TRADING["TRADING_COUNT"]
+        for pair in variables.AUTO_TRADING["TRADE_INSTRUMENTS"]:
+            granularity = variables.AUTO_TRADING["TRADING_GRANULARITY"]
+            count = variables.AUTO_TRADING["TRADING_COUNT"]
             data, message = self.api.get_historical_data(pair, granularity, count)
             if data is not None:
                 for strategy_name, params in variables.OPTIMIZATION_RANGES.items():
@@ -130,7 +135,7 @@ class TradeBot:
                         optimization_results = optimizer.optimize()
                         logging.info(f"Optimized parameters for {pair} using {strategy_name}.")
             else:
-                logging.error(f"Failed to download historical data for {pair}: {message}")
+                logging.error(f"Failed to optimize parameters for {pair}: {message}")
 
     def enable_auto_trading(self):
         logging.info("Auto trading enabled.")

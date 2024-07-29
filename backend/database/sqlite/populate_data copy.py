@@ -9,7 +9,7 @@ import pandas as pd
 import requests
 from sqlalchemy import create_engine
 
-import defs
+import backend.defs as defs
 
 class PopulateHistory:
     def __init__(self, db_name='forex_data.db'):

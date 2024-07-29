@@ -6,9 +6,12 @@ import backend.defs as defs  # Make sure your API keys and URLs are defined here
 import logging
 import schedule
 import time
+from backend.utils.utility import configure_logging
+
+configure_logging("historical_data_file")
 
 # Configure logging
-logging.basicConfig(filename='./logs/forex_data_generator.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+# logging.basicConfig(filename='./logs/forex_data_generator.log', level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 class OandaAPI:
     def __init__(self):
@@ -28,36 +31,33 @@ class OandaAPI:
                 time.sleep(wait_time)
         raise requests.exceptions.RequestException("Max retries exceeded")
 
-    def get_historical_data(self, instrument, granularity='D', count=500):
-        url = f"{defs.OANDA_URL}/instruments/{instrument}/candles"
+    def get_historical_data(self, instrument, granularity, count):
+        endpoint = f"/instruments/{instrument}/candles"
         params = {
-            'granularity': granularity,
-            'count': count,
-            'price': 'M'
+            "granularity": granularity,
+            "count": count,
+            "price": "M"
         }
-        response = self._request_with_retries("GET", url, headers={'Authorization': f'Bearer {defs.API_KEY}'}, params=params)
-        if response.status_code == 200:
-            data = response.json()['candles']
-            df = pd.DataFrame.from_records([{
-                'time': candle['time'],
-                'open': candle['mid']['o'],
-                'high': candle['mid']['h'],
-                'low': candle['mid']['l'],
-                'close': candle['mid']['c']
-            } for candle in data])
-            df['time'] = pd.to_datetime(df['time'])
-            df.set_index('time', inplace=True)
-            
-            # Ensure numeric types for calculations
-            df['open'] = pd.to_numeric(df['open'])
-            df['high'] = pd.to_numeric(df['high'])
-            df['low'] = pd.to_numeric(df['low'])
-            df['close'] = pd.to_numeric(df['close'])
-            
-            return df
-        else:
-            logging.error(f"Failed to retrieve historical data for {instrument}: {response.status_code} {response.text}")
-            return None
+        try:
+            response = requests.get(self.api_url + endpoint, headers=self.headers, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                df = pd.DataFrame([{
+                    "time": candle["time"],
+                    "open": candle["mid"]["o"],
+                    "high": candle["mid"]["h"],
+                    "low": candle["mid"]["l"],
+                    "close": candle["mid"]["c"]
+                } for candle in data["candles"]])
+                logging.info(f"PRCode: oanda_api - I got historical data here!")
+                logging.info(f"Data columns for {instrument}: {df.columns}")
+                return df, "Success"
+            else:
+                logging.error(f"Failed to retrieve historical data: {response.status_code} {response.text}")
+                return None, response.text
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Request error: {e}")
+            return None, str(e)
 
 def store_historical_data():
     oanda_api = OandaAPI()
@@ -70,8 +70,17 @@ def store_historical_data():
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             df.to_csv(file_path)
             logging.info(f"Historical data for {pair} stored successfully.")
+            display_recent_entries(df, pair)
         else:
             logging.error(f"Failed to store historical data for {pair}.")
+
+
+def display_recent_entries(df, pair):
+    # Display the most recent entries based on the 'time' column
+    most_recent_entries = df.head(5)
+    print(f"These are the most recent entries for {pair}:")
+    print(most_recent_entries)
+    logging.info(f"Displayed most recent entries for {pair}")
 
 def run_daily():
     store_historical_data()
