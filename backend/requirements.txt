@@ -5,3 +5,5 @@ mplfinance
 pandas
 requests
 python-dotenv
+schedule
+sqlalchemy

@@ -16,18 +16,19 @@ from flask import (Flask, jsonify, redirect, render_template, request,
 from flask_assets import Bundle, Environment
 from backend.tradebot import TradeBot
 
-from backend.backtest.backtest_strategy import BacktestStrategy
 from backend.control.control_system import ControlSystem
+from backend.oanda_api.oanda_api import OandaAPI
+from backend.backtest.backtest_strategy import BacktestStrategy
 from backend.indicators.macd_indicator import MACDIndicator
 from backend.indicators.stochastic_indicator import StochasticIndicator
-from backend.oanda_api.oanda_api import OandaAPI
 from backend.optimization.optimize_strategy import OptimizeStrategy
-from backend.strategies.ema_crossover_strategy import EMACrossoverStrategy
-from backend.strategies.ema_strategy import EMAStrategy
 from backend.strategies.momentum_strategy import MomentumStrategy
-from backend.strategies.rsi_strategy import RSIStrategy
+from backend.strategies.ema_crossover_strategy import EMACrossoverStrategy
 from backend.strategies.sma_crossover_strategy import SMACrossoverStrategy
-from backend.strategies.sma_strategy import SMAStrategy
+from backend.utils.indicators import EMAIndicator
+from backend.utils.indicators import RSIIndicator
+from backend.utils.indicators import SMAIndicator   
+from backend.utils.indicators import BollingerBandsIndicator
 from backend.utils.utility import configure_logging
 
 app = Flask(__name__)
@@ -78,21 +79,119 @@ def start_bot():
     global bot_thread
     if not bot_thread:
         bot_thread = Thread(target=control_system.run_analysis)
+        trade_bot.start() # Start the trade bot
+        logging.info("Bot started")
         bot_thread.start()
-        return jsonify({"status": "success"})
+        logging.info("Bot thread started")
+        return jsonify({'status': 'success', 'message': 'Bot started successfully'})
     else:
-        return jsonify({"status": "Bot is already running"})
+        return jsonify({"status": "Is Bot is already running?"})
 
 @app.route("/stop_bot", methods=["POST"])
 def stop_bot():
     global bot_thread
     if bot_thread:
         variables.STATE_MACHINE = False
+        logging.info("State machine turned off. STATE_MACHINE set to False.")
+        trade_bot.stop()
+        logging.info("Bot stopped")
         bot_thread.join()
         bot_thread = None
-        return jsonify({"status": "success"})
+        return jsonify({'status': 'success', 'message': 'Bot stopped successfully'})
     else:
-        return jsonify({"status": "Bot is not running"})
+        return jsonify({"status": "Bot is not running at this time."})
+
+@app.route('/indicator_status')
+def indicator_status():
+    instrument = request.args.get('instrument')
+    # Replace with actual indicator status fetching logic
+    indicator_data = fetch_indicator_status(instrument)
+    if not indicator_data:
+        logging.error(f'Indicator data not found for {instrument}')
+        return jsonify({'error': 'Indicator data not found'}), 404
+    return jsonify(indicator_data)
+
+def fetch_indicator_status(instrument):
+    api = OandaAPI()
+    
+    # Adjust the instrument name if necessary
+    if instrument.startswith('OANDA:'):
+        instrument = instrument.replace('OANDA:', '')
+    
+    # Fetch data from the API
+    data, message = api.get_historical_data(instrument, granularity='D', count=500)
+    if data is None:
+        logging.error(f"Error fetching historical data for {instrument}: {message}")
+        return {'error': message}
+    
+    indicators = {
+        'RSI': lambda: RSIIndicator(variables.SETTINGS['INDICATORS']['RSI']['RSI_PERIOD']).get_current_value(data),
+        'SMA': lambda: SMAIndicator(variables.SETTINGS['INDICATORS']['SMA']['SMA_PERIOD']).get_current_value(data),
+        'EMA': lambda: EMAIndicator(variables.SETTINGS['INDICATORS']['EMA']['EMA_PERIOD']).get_current_value(data),
+        'MACD': lambda: MACDIndicator(
+            variables.SETTINGS['INDICATORS']['MACD']['MACD_FAST_PERIOD'],
+            variables.SETTINGS['INDICATORS']['MACD']['MACD_SLOW_PERIOD'],
+            variables.SETTINGS['INDICATORS']['MACD']['MACD_SIGNAL_PERIOD']
+        ).get_current_value(data),
+        'BollingerBands': lambda: BollingerBandsIndicator(
+            variables.SETTINGS['INDICATORS']['BOLLINGER_BANDS']['BOLLINGER_BANDS_PERIOD'],
+            variables.SETTINGS['INDICATORS']['BOLLINGER_BANDS']['BOLLINGER_BANDS_STD_DEV']
+        ).get_current_value(data),
+        'Stochastic': lambda: StochasticIndicator(
+            api, instrument,
+            variables.SETTINGS['INDICATORS']['STOCHASTIC']['STOCHASTIC_K_PERIOD'],
+            variables.SETTINGS['INDICATORS']['STOCHASTIC']['STOCHASTIC_D_PERIOD']
+        ).get_current_value(data)
+    }
+
+    status = {}
+    for name, get_value in indicators.items():
+        try:
+            value = get_value()
+            status[name] = evaluate_indicator_status(name, value)
+        except Exception as e:
+            logging.error(f"Error fetching {name} for {instrument}: {str(e)}")
+            status[name] = 'error'
+
+    return status
+
+def evaluate_indicator_status(name, value):
+    thresholds = {
+        'RSI': {'high': variables.SETTINGS['INDICATORS']['RSI']['RSI_OVERBOUGHT'], 'low': variables.SETTINGS['INDICATORS']['RSI']['RSI_OVERSOLD']},
+        'SMA': {'high': variables.SETTINGS['INDICATORS']['SMA']['Slow_Period'], 'low': variables.SETTINGS['INDICATORS']['SMA']['Fast_Period']},
+        'EMA': {'high': variables.SETTINGS['INDICATORS']['EMA']['Slow_Period'], 'low': variables.SETTINGS['INDICATORS']['EMA']['Fast_Period']},
+        'MACD': {'high': 0, 'low': 0},  # MACD thresholds are not defined in the provided settings
+        'BollingerBands': {'high': 1, 'low': -1},  # Example thresholds, adjust as needed
+        'Stochastic': {'high': 80, 'low': 20}  # Example thresholds, adjust as needed
+    }
+
+    if name not in thresholds:
+        return 'unknown'
+
+    if value is None:
+        return 'error'
+
+    if name == 'MACD':
+        if value > thresholds[name]['high']:
+            return 'green'
+        elif value < thresholds[name]['low']:
+            return 'red'
+        else:
+            return 'yellow'
+    elif name == 'BollingerBands':
+        if value['price'] > value['upper']:
+            return 'green'
+        elif value['price'] < value['lower']:
+            return 'red'
+        else:
+            return 'yellow'
+    else:
+        if value > thresholds[name]['high']:
+            return 'green'
+        elif value < thresholds[name]['low']:
+            return 'red'
+        else:
+            return 'yellow'
 
 @app.route("/execute_trades", methods=["POST"])
 def execute_trades():
@@ -152,6 +251,7 @@ def auto_trades():
 @app.route('/get_state', methods=['GET'])
 def get_state():
     state = 'on' if STATE_MACHINE else 'off'
+    logging.info(f'State machine is now {state}')
     return jsonify({'state': state, 'status': 'success'})
 
 @app.route('/set_state', methods=['POST'])
@@ -159,10 +259,17 @@ def set_state():
     global STATE_MACHINE
     new_state = request.form.get('state')
     data = request.json
+    state = data.get('state')
+    trade_bot.set_state(state)
+    
     if ('state' in data or new_state == 'on'):
-        STATE_MACHINE = data['state'] == 'on'
-        logging.info(f"State changed to {new_state}")
-        return jsonify({"status": "State updated successfully.", "new_state": new_state})
+    # Update the STATE_MACHINE variable in variables.py
+        with open('variables.py', 'w') as f:
+            f.write(f'STATE_MACHINE = {STATE_MACHINE}')
+            f.write(f'STATE_MACHINE = {"True" if state == "on" else "False"}')
+        
+        logging.info(f'State machine set to {state}')
+        return jsonify({"status": "State updated successfully.", "new_state": state})
     return jsonify({"status": "Invalid state.", "error": "Invalid state value provided."})
 
 @app.route("/select_strategy", methods=["POST"])

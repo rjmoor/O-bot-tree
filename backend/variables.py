@@ -18,6 +18,39 @@ BACKTESTING = {
     "BT_TYPE" : 'Strategy', 
 }
 
+SETTINGS = {
+    "INDICATORS": {
+        "RSI": {
+            "RSI_PERIOD": 14,
+            "RSI_OVERBOUGHT": 70,
+            "RSI_OVERSOLD": 30
+        },
+        "MACD": {
+            "MACD_FAST_PERIOD": 12,
+            "MACD_SLOW_PERIOD": 26,
+            "MACD_SIGNAL_PERIOD": 9
+        },
+        "SMA": {
+            "SMA_PERIOD": 50,
+            "Fast_Period": 10,
+            "Slow_Period": 50
+        },
+        "EMA": {
+            "EMA_PERIOD": 50,
+            "Fast_Period": 10,
+            "Slow_Period": 50
+        },
+        "BOLLINGER_BANDS": {
+            "BOLLINGER_BANDS_PERIOD": 20,
+            "BOLLINGER_BANDS_STD_DEV": 2
+        },
+        "STOCHASTIC": {
+            "STOCHASTIC_K_PERIOD": 14,
+            "STOCHASTIC_D_PERIOD": 3
+        }
+    }
+}
+
 OPTIMIZATION_RANGES = {
     "RSI": {
         "RSI_PERIOD": [10, 20, 60],
@@ -49,7 +82,7 @@ OPTIMIZATION_RANGES = {
     }
 }
 
-LIVE_TRADING = {
+AUTO_TRADING = {
     "TRADE_INSTRUMENTS" : ["EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD", "NZD_USD", "USD_CHF"],
     "TRADE_UNITS" : 1000,
     "TRADING_COUNT" : 100,

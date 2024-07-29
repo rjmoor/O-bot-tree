@@ -117,6 +117,7 @@ class OandaAPI:
             logging.error(f"Error retrieving open positions: {e}")
             return None, str(e)
 
+
     def get_historical_data(self, instrument, granularity='D', count=500):
         url = f"{defs.OANDA_URL}/instruments/{instrument}/candles"
         params = {
@@ -129,14 +130,24 @@ class OandaAPI:
             logging.error("No response received for get_historical_data")
             return None, "No response received"
         if response.status_code == 200:
-            data = response.json()['candles']
+            data = response.json().get('candles', [])
+            print("PRCode: oanda_api - I got historical data here!")
+            if not data:
+                logging.error("No candles data found in the response")
+                return None, "No candles data found in the response"
+            
             df = pd.DataFrame.from_records([{
                 'time': candle['time'],
                 'open': candle['mid']['o'],
                 'high': candle['mid']['h'],
                 'low': candle['mid']['l'],
                 'close': candle['mid']['c']
-            } for candle in data])
+            } for candle in data if 'mid' in candle and 'time' in candle])
+            
+            if 'time' not in df.columns:
+                logging.error("No 'time' column in the historical data")
+                return None, "No 'time' column in the historical data"
+            
             df['time'] = pd.to_datetime(df['time'])
             df.set_index('time', inplace=True)
             
@@ -145,9 +156,13 @@ class OandaAPI:
             df['low'] = pd.to_numeric(df['low'])
             df['close'] = pd.to_numeric(df['close'])
             
+            logging.info(f"Retrieved historical data for {instrument}: {df.head()}")
             return df, "Historical data retrieved successfully!"
         elif response:
-            logging.error(f"Failed to retrieve historical data: {response.status_code} {response.text}")
+            logging.error(f"Got a response but failed to retrieve historical data: {response.status_code} {response.text}")
+            return None, f"Failed to retrieve historical data: {response.status_code} {response.text}"
+        elif response is None:
+            logging.error(f"There was an error... failed to retrieve a response for historical data: {response.status_code} {response.text}")
             return None, f"Failed to retrieve historical data: {response.status_code} {response.text}"
         else:
             logging.error("Failed to retrieve historical data: No response received")
